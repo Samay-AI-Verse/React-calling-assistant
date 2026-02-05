@@ -1739,3 +1739,17 @@ textarea.form-control {
 .dot.active {
     background: var(--primary-500);
 }
+
+/* Hide Scrollbar Globally */
+::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+    display: none;
+}
+
+* {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
