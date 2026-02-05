@@ -41,14 +41,29 @@ const Campaigns = () => {
             if (res.data && res.data.campaigns) {
                 setCampaigns(res.data.campaigns);
 
+                let target = null;
                 // If we have a selected campaign, refresh its data from the new list
                 if (selectedCampaign) {
                     const found = res.data.campaigns.find(c => c.id === selectedCampaign.id);
-                    if (found) setSelectedCampaign(found);
+                    if (found) target = found;
                 }
                 // Else select first if none selected and not creating
                 else if (res.data.campaigns.length > 0 && !isCreating) {
-                    setSelectedCampaign(res.data.campaigns[0]);
+                    target = res.data.campaigns[0];
+                }
+
+                if (target) {
+                    setSelectedCampaign(target);
+                    // UX IMPROVEMENT: If the default/selected campaign is "In Design", automatically open the wizard
+                    // This fixes the confusing "uncomplete" state on refresh
+                    if (target.status === 'In Design') {
+                        setWizardData(target.config || {});
+                        setCurrentStep(target.config?.currentStep || 2);
+                        setIsCreating(true);
+                    } else if (isCreating && target.status !== 'In Design') {
+                        // If we were creating but now selected a completed one, stop creating
+                        setIsCreating(false);
+                    }
                 }
             }
         } catch (error) {
@@ -292,6 +307,7 @@ const Campaigns = () => {
                             className={`nav-item ${selectedCampaign?.id === camp.id ? 'active' : ''}`}
                             onClick={() => {
                                 setSelectedCampaign(camp);
+                                setShowLaunchModal(false); // Ensure modal is closed
                                 // Resume wizard if campaign is In Design
                                 if (camp.status === 'In Design' || (camp.config && camp.config.currentStep && camp.config.currentStep < 5)) {
                                     setWizardData(camp.config || {});
