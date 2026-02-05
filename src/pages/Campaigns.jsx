@@ -5,7 +5,21 @@ import './Campaigns.css'; // Import the new styles
 const Campaigns = () => {
     const [campaigns, setCampaigns] = useState([]);
     const [selectedCampaign, setSelectedCampaign] = useState(null);
-    const [activeTab, setActiveTab] = useState('agent'); // Default can be agent
+    const [activeTab, setActiveTab] = useState('source'); // Default tab for viewed campaign
+
+    // Wizard State
+    const [isCreating, setIsCreating] = useState(false);
+    const [currentStep, setCurrentStep] = useState(1);
+    const [wizardData, setWizardData] = useState({
+        name: '',
+        source: [], // candidates
+        mode: 'technical', // interview steps
+        agent: 'aanya',
+        voice: 'raju',
+        lang: 'en-us',
+        strict: 'balanced',
+        script: ''
+    });
 
     // Fetch campaigns from backend
     const fetchCampaigns = async () => {
@@ -13,8 +27,8 @@ const Campaigns = () => {
             const res = await axios.get('/api/campaigns');
             if (res.data && res.data.campaigns) {
                 setCampaigns(res.data.campaigns);
-                // Select first if none selected
-                if (!selectedCampaign && res.data.campaigns.length > 0) {
+                // Select first if none selected and not creating
+                if (!selectedCampaign && res.data.campaigns.length > 0 && !isCreating) {
                     setSelectedCampaign(res.data.campaigns[0]);
                 }
             }
@@ -27,31 +41,22 @@ const Campaigns = () => {
         fetchCampaigns();
     }, []);
 
-    const handleCreateCampaign = async () => {
-        const name = prompt("Enter Campaign Name:");
-        if (name) {
-            try {
-                // Optimistic update or refetch
-                await axios.post('/api/campaigns/create', { name, type: 'audio' });
-                fetchCampaigns();
-            } catch (error) {
-                console.error("Error creating campaign:", error);
-                alert("Failed to create campaign");
-            }
-        }
+    const startCreation = () => {
+        setIsCreating(true);
+        setSelectedCampaign(null);
+        setCurrentStep(1);
+        setWizardData({
+            name: '', source: [], mode: 'technical', agent: 'aanya', voice: 'raju', lang: 'en-us', strict: 'balanced', script: ''
+        });
     };
 
     const handleDeleteCampaign = async (e, id) => {
-        e.stopPropagation(); // Prevent selecting the campaign while deleting
+        e.stopPropagation();
         if (window.confirm("Are you sure you want to delete this campaign? This cannot be undone.")) {
             try {
                 await axios.delete(`/api/campaigns/${id}`);
-
-                // Update local state
                 const updatedList = campaigns.filter(c => c.id !== id);
                 setCampaigns(updatedList);
-
-                // If currently selected was deleted, select another one
                 if (selectedCampaign && selectedCampaign.id === id) {
                     setSelectedCampaign(updatedList.length > 0 ? updatedList[0] : null);
                 }
@@ -59,6 +64,47 @@ const Campaigns = () => {
                 console.error("Error deleting campaign:", error);
                 alert("Failed to delete campaign");
             }
+        }
+    };
+
+    const handleWizardNext = async () => {
+        if (currentStep === 1 && !wizardData.name) {
+            alert("Please enter a campaign name");
+            return;
+        }
+
+        if (currentStep < 5) {
+            setCurrentStep(currentStep + 1);
+        } else {
+            // FINISH - Create Campaign
+            try {
+                const res = await axios.post('/api/campaigns/create', {
+                    name: wizardData.name,
+                    type: 'audio',
+                    config: wizardData // Save all wizard config
+                });
+
+                await fetchCampaigns();
+                setIsCreating(false);
+                // Select the new campaign (assuming it's the first one in the updated list or we find it)
+                // ideally backend returns the new object, we can set it directly
+                if (res.data.campaign) {
+                    setSelectedCampaign(res.data.campaign);
+                }
+                setActiveTab('source'); // Reset to first tab
+            } catch (error) {
+                console.error("Error creating campaign:", error);
+                alert("Failed to create campaign");
+            }
+        }
+    };
+
+    const handleWizardBack = () => {
+        if (currentStep > 1) {
+            setCurrentStep(currentStep - 1);
+        } else {
+            setIsCreating(false); // Cancel creation
+            if (campaigns.length > 0) setSelectedCampaign(campaigns[0]);
         }
     };
 
@@ -72,7 +118,7 @@ const Campaigns = () => {
                     </div>
                 </div>
 
-                <button className="btn-new-campaign" onClick={handleCreateCampaign}>
+                <button className="btn-new-campaign" onClick={startCreation}>
                     <i className="fa-solid fa-plus"></i> New Campaign
                 </button>
 
@@ -86,7 +132,7 @@ const Campaigns = () => {
                         <div
                             key={camp.id}
                             className={`nav-item ${selectedCampaign?.id === camp.id ? 'active' : ''}`}
-                            onClick={() => setSelectedCampaign(camp)}
+                            onClick={() => { setSelectedCampaign(camp); setIsCreating(false); }}
                             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}
                         >
                             <div style={{ overflow: 'hidden' }}>
@@ -108,7 +154,132 @@ const Campaigns = () => {
 
             {/* Main Content */}
             <main className="vapi-main">
-                {selectedCampaign ? (
+                {isCreating ? (
+                    <div className="wizard-container">
+                        {/* 1. Header */}
+                        <div className="wizard-header">
+                            <div className="wizard-title">
+                                <h2>
+                                    <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--primary-500)' }}></i>
+                                    New Campaign
+                                </h2>
+                            </div>
+                            <button className="btn-cancel" onClick={() => setIsCreating(false)}>
+                                <i className="fa-solid fa-xmark"></i> Cancel
+                            </button>
+                        </div>
+
+                        {/* 2. Progress Bar */}
+                        <div className="wizard-progress-bar">
+                            <div className="progress-track">
+                                {[
+                                    { num: 1, label: 'Campaign Details' },
+                                    { num: 2, label: 'Source Data' },
+                                    { num: 3, label: 'Interview Flow' },
+                                    { num: 4, label: 'AI Persona' },
+                                    { num: 5, label: 'Script & Context' }
+                                ].map((step) => (
+                                    <div key={step.num} className={`progress-step ${currentStep === step.num ? 'active' : ''} ${currentStep > step.num ? 'completed' : ''}`}>
+                                        <div className="step-circle">
+                                            {currentStep > step.num ? <i className="fa-solid fa-check"></i> : step.num}
+                                        </div>
+                                        {step.label}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 3. Scrollable Content Area */}
+                        <div className="wizard-content-scroll">
+                            <div className="wizard-step-anim">
+                                {/* Step 1: Name */}
+                                {currentStep === 1 && (
+                                    <div style={{ maxWidth: '600px', margin: '40px auto' }}>
+                                        <h2 style={{ marginBottom: '12px', fontSize: '24px' }}>Let's start with a name</h2>
+                                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
+                                            What position or role are you hiring for? This helps categorize your interviews.
+                                        </p>
+                                        <div style={{ marginBottom: '24px' }}>
+                                            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-secondary)' }}>CAMPAIGN NAME</label>
+                                            <input
+                                                type="text"
+                                                className="input-dark"
+                                                placeholder="e.g. Senior Backend Developer - Q1 2024"
+                                                style={{ fontSize: '18px', padding: '20px' }}
+                                                value={wizardData.name}
+                                                onChange={(e) => setWizardData({ ...wizardData, name: e.target.value })}
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step 2: Source Data */}
+                                {currentStep === 2 && (
+                                    <>
+                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                            <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Who should we call?</h2>
+                                            <p style={{ color: 'var(--text-secondary)' }}>Upload a CSV list of candidates or add them manually.</p>
+                                        </div>
+                                        <SourceDataTab campaignId="temp" isWizard={true} setData={(data) => setWizardData({ ...wizardData, source: data })} />
+                                    </>
+                                )}
+
+                                {/* Step 3: Flow */}
+                                {currentStep === 3 && (
+                                    <>
+                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                            <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Configure the Interview</h2>
+                                            <p style={{ color: 'var(--text-secondary)' }}>Choose the structure and strictness of the AI interviewer.</p>
+                                        </div>
+                                        <InterviewStepsTab isWizard={true} setData={(mode) => setWizardData({ ...wizardData, mode })} />
+                                    </>
+                                )}
+
+                                {/* Step 4: Persona */}
+                                {currentStep === 4 && (
+                                    <>
+                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                            <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Select your AI Recruiter</h2>
+                                            <p style={{ color: 'var(--text-secondary)' }}>Choose a persona and voice that matches your company culture.</p>
+                                        </div>
+                                        <AgentSelector isWizard={true} setData={(data) => setWizardData({ ...wizardData, ...data })} />
+                                    </>
+                                )}
+
+                                {/* Step 5: Script */}
+                                {currentStep === 5 && (
+                                    <>
+                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                            <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Job Context & Script</h2>
+                                            <p style={{ color: 'var(--text-secondary)' }}>Provide the Job Description so the AI knows what to look for.</p>
+                                        </div>
+                                        <ScriptTab isWizard={true} setData={(script) => setWizardData({ ...wizardData, script })} />
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 4. Footer Actions */}
+                        <div className="wizard-footer">
+                            <button className="btn-back" onClick={handleWizardBack}>
+                                {currentStep === 1 ? 'Cancel' : 'Back'}
+                            </button>
+
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                {currentStep < 5 ? (
+                                    <button className="btn-next" onClick={handleWizardNext}>
+                                        Next Step <i className="fa-solid fa-arrow-right"></i>
+                                    </button>
+                                ) : (
+                                    <button className="btn-next btn-launch" onClick={handleWizardNext}>
+                                        <i className="fa-solid fa-rocket"></i> Launch Campaign
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ) : selectedCampaign ? (
                     <>
                         {/* Header */}
                         <header className="vapi-header">
@@ -121,19 +292,10 @@ const Campaigns = () => {
                             </button>
                         </header>
 
-                        {/* Tabs */}
+                        {/* Tabs - Consolidated */}
                         <div className="tabs-bar">
                             <button className={`tab-btn ${activeTab === 'source' ? 'active' : ''}`} onClick={() => setActiveTab('source')}>
                                 <i className="fa-solid fa-database"></i> Source Data
-                            </button>
-                            <button className={`tab-btn ${activeTab === 'steps' ? 'active' : ''}`} onClick={() => setActiveTab('steps')}>
-                                <i className="fa-solid fa-network-wired"></i> Interview Steps
-                            </button>
-                            <button className={`tab-btn ${activeTab === 'agent' ? 'active' : ''}`} onClick={() => setActiveTab('agent')}>
-                                <i className="fa-solid fa-brain"></i> AI Persona
-                            </button>
-                            <button className={`tab-btn ${activeTab === 'script' ? 'active' : ''}`} onClick={() => setActiveTab('script')}>
-                                <i className="fa-solid fa-file-pen"></i> Script
                             </button>
                             <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
                                 <i className="fa-solid fa-chart-pie"></i> Reports
@@ -141,16 +303,34 @@ const Campaigns = () => {
                             <button className={`tab-btn ${activeTab === 'cost' ? 'active' : ''}`} onClick={() => setActiveTab('cost')}>
                                 <i className="fa-solid fa-coins"></i> Cost
                             </button>
+                            <button className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                                <i className="fa-solid fa-sliders"></i> Edit Configuration
+                            </button>
                         </div>
 
                         {/* Content */}
                         <div className="form-scroll-area">
                             {activeTab === 'source' && <SourceDataTab campaignId={selectedCampaign.id} />}
-                            {activeTab === 'steps' && <InterviewStepsTab />}
-                            {activeTab === 'agent' && <AgentSelector />}
-                            {activeTab === 'script' && <ScriptTab />}
                             {activeTab === 'reports' && <ReportsTab />}
                             {activeTab === 'cost' && <CostTab />}
+                            {activeTab === 'settings' && (
+                                <div className="tab-content-wrapper">
+                                    <div className="section-head">Interview Configuration</div>
+                                    <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '32px' }}>
+                                        <InterviewStepsTab />
+                                    </div>
+
+                                    <div className="section-head">AI Persona Settings</div>
+                                    <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '32px' }}>
+                                        <AgentSelector />
+                                    </div>
+
+                                    <div className="section-head">Script & Context</div>
+                                    <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                                        <ScriptTab />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </>
                 ) : (
@@ -176,7 +356,7 @@ const Campaigns = () => {
 };
 
 // --- 1. Source Data Tab ---
-const SourceDataTab = ({ campaignId }) => {
+const SourceDataTab = ({ campaignId, isWizard, setData }) => {
     const [candidates, setCandidates] = useState([]);
 
     // Manual State
@@ -186,21 +366,31 @@ const SourceDataTab = ({ campaignId }) => {
 
     const handleAdd = () => {
         if (name && phone) {
-            setCandidates([...candidates, { name, phone, email }]);
+            const newList = [...candidates, { name, phone, email }];
+            setCandidates(newList);
             setName(''); setPhone(''); setEmail('');
+            if (isWizard && setData) setData(newList);
         }
     };
 
     return (
         <div>
-            <div className="upload-zone">
-                <i className="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                <h3 style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '8px' }}>Bulk Import Candidates</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Drag & drop CSV or Excel files here</p>
-            </div>
+            {!isWizard && (
+                <div className="upload-zone">
+                    <i className="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                    <h3 style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '8px' }}>Bulk Import Candidates</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Drag & drop CSV or Excel files here</p>
+                </div>
+            )}
+
+            {isWizard && (
+                <div style={{ marginBottom: '24px', padding: '20px', border: '2px dashed var(--border-subtle)', borderRadius: '8px', textAlign: 'center' }}>
+                    Click to upload CSV (Mock)
+                </div>
+            )}
 
             <div className="section-head" style={{ marginTop: '30px', marginBottom: '16px' }}>
-                OR ADD INDIVIDUALLY
+                ADD CANDIDATE
             </div>
 
             <div className="manual-grid">
@@ -238,27 +428,32 @@ const SourceDataTab = ({ campaignId }) => {
 };
 
 // --- 2. Interview Steps Tab ---
-const InterviewStepsTab = () => {
+const InterviewStepsTab = ({ isWizard, setData }) => {
     const [mode, setMode] = useState('technical');
+
+    const handleSetMode = (m) => {
+        setMode(m);
+        if (isWizard && setData) setData(m);
+    };
 
     return (
         <div>
-            <div className="section-head">1. SELECT INTERVIEW MODE</div>
+            {!isWizard && <div className="section-head">1. INTERVIEW MODE</div>}
             <div className="grid-steps">
                 {/* Technical */}
-                <div className={`step-card ${mode === 'technical' ? 'active' : ''}`} onClick={() => setMode('technical')}>
+                <div className={`step-card ${mode === 'technical' ? 'active' : ''}`} onClick={() => handleSetMode('technical')}>
                     <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, #ef4444, #7f1d1d)' }}></div>
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>Technical</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Coding & System Design</div>
                 </div>
                 {/* HR */}
-                <div className={`step-card ${mode === 'hr' ? 'active' : ''}`} onClick={() => setMode('hr')}>
+                <div className={`step-card ${mode === 'hr' ? 'active' : ''}`} onClick={() => handleSetMode('hr')}>
                     <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, #eab308, #713f12)' }}></div>
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>HR Round</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Culture & Soft Skills</div>
                 </div>
                 {/* Mixed */}
-                <div className={`step-card ${mode === 'mixed' ? 'active' : ''}`} onClick={() => setMode('mixed')}>
+                <div className={`step-card ${mode === 'mixed' ? 'active' : ''}`} onClick={() => handleSetMode('mixed')}>
                     <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, cyan, #0e7490)' }}></div>
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>Mixed</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>50% Tech + 50% HR</div>
@@ -279,28 +474,47 @@ const InterviewStepsTab = () => {
 };
 
 // --- 3. Agent Selector (AI Persona) ---
-const AgentSelector = () => {
+const AgentSelector = ({ isWizard, setData }) => {
     const [persona, setPersona] = useState('aanya');
     const [voice, setVoice] = useState('raju');
     const [lang, setLang] = useState('en-us');
     const [strict, setStrict] = useState('balanced');
+
+    // Helper to bubble up changes
+    const update = (key, val) => {
+        if (key === 'persona') setPersona(val);
+        if (key === 'voice') setVoice(val);
+        if (key === 'lang') setLang(val);
+        if (key === 'strict') setStrict(val);
+
+        if (isWizard && setData) {
+            // We need current state but state updates are async, 
+            // construct object based on what we know + change
+            setData({
+                agent: key === 'persona' ? val : persona,
+                voice: key === 'voice' ? val : voice,
+                lang: key === 'lang' ? val : lang,
+                strict: key === 'strict' ? val : strict
+            });
+        }
+    };
 
     return (
         <div>
             {/* 1. AI Persona */}
             <div className="section-head">1. Select AI Agent Persona</div>
             <div className="grid-personas">
-                <div className={`persona-card ${persona === 'aanya' ? 'active' : ''}`} onClick={() => setPersona('aanya')}>
+                <div className={`persona-card ${persona === 'aanya' ? 'active' : ''}`} onClick={() => update('persona', 'aanya')}>
                     <div className="persona-avatar purple"></div>
                     <div className="persona-name">Aanya - HR Pro</div>
                     <div className="persona-desc">Polite & structured. Best for verification & screening.</div>
                 </div>
-                <div className={`persona-card ${persona === 'rohan' ? 'active' : ''}`} onClick={() => setPersona('rohan')}>
+                <div className={`persona-card ${persona === 'rohan' ? 'active' : ''}`} onClick={() => update('persona', 'rohan')}>
                     <div className="persona-avatar blue"></div>
                     <div className="persona-name">Rohan - Tech Lead</div>
                     <div className="persona-desc">Direct & technical. Drills down into logic and coding concepts.</div>
                 </div>
-                <div className={`persona-card ${persona === 'kavya' ? 'active' : ''}`} onClick={() => setPersona('kavya')}>
+                <div className={`persona-card ${persona === 'kavya' ? 'active' : ''}`} onClick={() => update('persona', 'kavya')}>
                     <div className="persona-avatar orange"></div>
                     <div className="persona-name">Kavya - Casual</div>
                     <div className="persona-desc">Warm, relaxed & conversational. Great for culture fit assessment.</div>
@@ -310,21 +524,21 @@ const AgentSelector = () => {
             {/* 2. Voice Model */}
             <div className="section-head">2. Select Voice Model</div>
             <div className="grid-voices">
-                <div className={`voice-card ${voice === 'raju' ? 'active' : ''}`} onClick={() => setVoice('raju')}>
+                <div className={`voice-card ${voice === 'raju' ? 'active' : ''}`} onClick={() => update('voice', 'raju')}>
                     <div className="voice-orb" style={{ background: 'conic-gradient(#ea580c, #fdba74)' }}></div>
                     <div className="voice-info">
                         <h4>Raju <i className="fa-solid fa-circle-check" style={{ color: '#3b82f6', fontSize: '12px' }}></i></h4>
                         <div className="voice-tag">🇮🇳 Hindi + English</div>
                     </div>
                 </div>
-                <div className={`voice-card ${voice === 'priya' ? 'active' : ''}`} onClick={() => setVoice('priya')}>
+                <div className={`voice-card ${voice === 'priya' ? 'active' : ''}`} onClick={() => update('voice', 'priya')}>
                     <div className="voice-orb" style={{ background: 'conic-gradient(#dc2626, #fca5a5)' }}></div>
                     <div className="voice-info">
                         <h4>Priya</h4>
                         <div className="voice-tag">🇮🇳 English</div>
                     </div>
                 </div>
-                <div className={`voice-card ${voice === 'anjali' ? 'active' : ''}`} onClick={() => setVoice('anjali')}>
+                <div className={`voice-card ${voice === 'anjali' ? 'active' : ''}`} onClick={() => update('voice', 'anjali')}>
                     <div className="voice-orb" style={{ background: 'conic-gradient(#7c3aed, #d8b4fe)' }}></div>
                     <div className="voice-info">
                         <h4>Anjali <i className="fa-solid fa-circle-check" style={{ color: '#3b82f6', fontSize: '12px' }}></i></h4>
@@ -333,63 +547,58 @@ const AgentSelector = () => {
                 </div>
             </div>
             {/* Show "See More Voices" button if needed (from screenshot) */}
-            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                <button style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', padding: '8px 16px', borderRadius: '20px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>
-                    See More Voices <i className="fa-solid fa-chevron-down"></i>
-                </button>
-            </div>
+            {!isWizard && (
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <button style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', padding: '8px 16px', borderRadius: '20px', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}>
+                        See More Voices <i className="fa-solid fa-chevron-down"></i>
+                    </button>
+                </div>
+            )}
 
 
             {/* 3. Communication Language */}
             <div className="section-head">3. Communication Language</div>
             <div className="grid-langs">
-                <div className={`lang-card ${lang === 'en-us' ? 'active' : ''}`} onClick={() => setLang('en-us')}>
+                {/* Simplified view for creation flow, add full grid back if needed */}
+                <div className={`lang-card ${lang === 'en-us' ? 'active' : ''}`} onClick={() => update('lang', 'en-us')}>
                     <img src="https://flagcdn.com/w40/us.png" alt="US" className="flag" />
-                    <div>
-                        <div style={{ fontWeight: 600, fontSize: '13px' }}>English (US)</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Professional</div>
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>English (US)</div>
+                    {!isWizard && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Professional</div>}
                 </div>
-                <div className={`lang-card ${lang === 'en-in' ? 'active' : ''}`} onClick={() => setLang('en-in')}>
+                <div className={`lang-card ${lang === 'en-in' ? 'active' : ''}`} onClick={() => update('lang', 'en-in')}>
                     <img src="https://flagcdn.com/w40/in.png" alt="IN" className="flag" />
-                    <div>
-                        <div style={{ fontWeight: 600, fontSize: '13px' }}>English (India)</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Native Accent</div>
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>English (India)</div>
+                    {!isWizard && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Native Accent</div>}
                 </div>
-                <div className={`lang-card ${lang === 'hi' ? 'active' : ''}`} onClick={() => setLang('hi')}>
+                <div className={`lang-card ${lang === 'hi' ? 'active' : ''}`} onClick={() => update('lang', 'hi')}>
                     <img src="https://flagcdn.com/w40/in.png" alt="IN" className="flag" />
-                    <div>
-                        <div style={{ fontWeight: 600, fontSize: '13px' }}>Hindi (हिंदी)</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Formal / Casual</div>
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>Hindi {!isWizard && '(हिंदी)'}</div>
+                    {!isWizard && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Formal / Casual</div>}
                 </div>
-                <div className={`lang-card ${lang === 'mr' ? 'active' : ''}`} onClick={() => setLang('mr')}>
+                <div className={`lang-card ${lang === 'mr' ? 'active' : ''}`} onClick={() => update('lang', 'mr')}>
                     <img src="https://flagcdn.com/w40/in.png" alt="IN" className="flag" />
-                    <div>
-                        <div style={{ fontWeight: 600, fontSize: '13px' }}>Marathi (मराठी)</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Regional</div>
-                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '13px' }}>Marathi {!isWizard && '(मराठी)'}</div>
+                    {!isWizard && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Regional</div>}
                 </div>
             </div>
 
             {/* 4. Interview Strictness */}
-            <div className="section-head">4. Interview Strictness & Behavior</div>
+            <div className="section-head">4. Interview Strictness {!isWizard && '& Behavior'}</div>
             <div className="grid-strict">
-                <div className={`strict-card easy ${strict === 'friendly' ? 'active' : ''}`} onClick={() => setStrict('friendly')}>
+                <div className={`strict-card easy ${strict === 'friendly' ? 'active' : ''}`} onClick={() => update('strict', 'friendly')}>
                     <div className="strict-icon"><i className="fa-regular fa-face-smile"></i></div>
-                    <div className="strict-title">Friendly (Easy)</div>
-                    <div className="strict-desc">Supportive, gives hints, focuses on comfort. Good for internships.</div>
+                    <div className="strict-title">Friendly {!isWizard && '(Easy)'}</div>
+                    {!isWizard && <div className="strict-desc">Supportive, gives hints, focuses on comfort. Good for internships.</div>}
                 </div>
-                <div className={`strict-card medium ${strict === 'balanced' ? 'active' : ''}`} onClick={() => setStrict('balanced')}>
+                <div className={`strict-card medium ${strict === 'balanced' ? 'active' : ''}`} onClick={() => update('strict', 'balanced')}>
                     <div className="strict-icon"><i className="fa-solid fa-scale-balanced"></i></div>
-                    <div className="strict-title">Balanced (Medium)</div>
-                    <div className="strict-desc">Professional but fair. Standard industry interview style.</div>
+                    <div className="strict-title">Balanced {!isWizard && '(Medium)'}</div>
+                    {!isWizard && <div className="strict-desc">Professional but fair. Standard industry interview style.</div>}
                 </div>
-                <div className={`strict-card hard ${strict === 'strict' ? 'active' : ''}`} onClick={() => setStrict('strict')}>
+                <div className={`strict-card hard ${strict === 'strict' ? 'active' : ''}`} onClick={() => update('strict', 'strict')}>
                     <div className="strict-icon"><i className="fa-solid fa-gavel"></i></div>
-                    <div className="strict-title">Strict (Hard)</div>
-                    <div className="strict-desc">Grills the candidate. Zero tolerance for vague answers. Stress test.</div>
+                    <div className="strict-title">Strict {!isWizard && '(Hard)'}</div>
+                    {!isWizard && <div className="strict-desc">Grills the candidate. Zero tolerance for vague answers. Stress test.</div>}
                 </div>
             </div>
 
@@ -399,7 +608,7 @@ const AgentSelector = () => {
 };
 
 // --- 4. Script Tab ---
-const ScriptTab = () => {
+const ScriptTab = ({ isWizard, setData }) => {
     return (
         <div>
             <div className="script-banner">
@@ -412,7 +621,7 @@ const ScriptTab = () => {
 
             <div className="section-head"><i className="fa-solid fa-building"></i> Company Identity</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                <input type="text" className="input-dark" placeholder="Company Name (e.g. TechFlow)" />
+                <input type="text" className="input-dark" placeholder="Company Name (e.g. TechFlow)" onChange={(e) => isWizard && setData && setData(e.target.value)} />
                 <input type="text" className="input-dark" placeholder="Industry (e.g. Fintech)" />
             </div>
 
