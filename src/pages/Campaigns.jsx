@@ -23,6 +23,8 @@ const Campaigns = () => {
 
     // Launch Modal State
     const [showLaunchModal, setShowLaunchModal] = useState(false);
+    const [blueprintData, setBlueprintData] = useState(null);
+    const [isGenerating, setIsGenerating] = useState(false);
 
     // Fetch campaigns from backend
     const fetchCampaigns = async () => {
@@ -74,22 +76,54 @@ const Campaigns = () => {
         if (!selectedCampaign) return;
 
         try {
-            await axios.put(`/api/campaigns/${selectedCampaign.id}`, {
-                config: wizardData,
-                status: 'Active' // Launch status
+            // USER REQUEST: Call the actual launch endpoint to trigger Vapi calls
+            await axios.post('/api/launch-campaign', {
+                campaign_id: selectedCampaign.id,
+                vapi_agent_id: wizardData.agent || 'aanya', // Pass the selected agent key
+                vapi_voice_id: wizardData.voice || 'raju',  // Pass the selected voice key
+                system_prompt: blueprintData?.system_prompt || wizardData.script,
+                strictness: wizardData.strict,
+                interview_mode: wizardData.mode
             });
 
             await fetchCampaigns();
             setIsCreating(false);
             setShowLaunchModal(false);
             setActiveTab('source');
+            alert("Campaign Launched! Calls are being initiated.");
         } catch (error) {
             console.error("Error launching campaign:", error);
-            alert("Failed to update campaign");
+            // Fallback: If launch endpoint fails (e.g. Vapi not configured), just mark active
+            try {
+                await axios.put(`/api/campaigns/${selectedCampaign.id}`, {
+                    config: wizardData,
+                    status: 'Active'
+                });
+                setIsCreating(false);
+                setShowLaunchModal(false);
+                alert("Campaign Marked Active (Call initiation failed - check console/backend)");
+            } catch (e) {
+                alert("Failed to update campaign status");
+            }
         }
     };
 
+    // Validation Helper
+    const isStepValid = () => {
+        if (currentStep === 1) return !!wizardData.name.trim(); // Name required
+        if (currentStep === 2) return wizardData.source && wizardData.source.length > 0; // At least 1 candidate
+        if (currentStep === 3) return !!wizardData.mode; // Mode required (default is set, so usually true)
+        if (currentStep === 4) return !!wizardData.agent && !!wizardData.voice; // Agent & Voice required
+        if (currentStep === 5) return !!wizardData.script.trim(); // Script/JD required
+        return true;
+    };
+
     const handleWizardNext = async () => {
+        if (!isStepValid()) {
+            alert("Please complete the required fields before proceeding.");
+            return;
+        }
+
         if (currentStep === 1) {
             if (!wizardData.name) {
                 alert("Please enter a campaign name");
@@ -97,7 +131,7 @@ const Campaigns = () => {
             }
 
             // Check for duplicate name locally
-            const existing = campaigns.find(c => c.name.trim().toLowerCase() === wizardData.name.trim().toLowerCase());
+            const existing = campaigns.find(c => c.name.toLowerCase() === wizardData.name.toLowerCase());
             if (existing) {
                 // USER REQUEST: Resume/Edit existing campaign instead of blocking
                 setSelectedCampaign(existing);
@@ -150,8 +184,54 @@ const Campaigns = () => {
             }
             setCurrentStep(currentStep + 1);
         } else {
-            // FINISH - Show Launch Popup
-            setShowLaunchModal(true);
+            // FINISH - Generate Blueprint Call
+
+            // 1. Validation
+            if (!isStepValid()) {
+                alert("Please paste the Job Description or Script.");
+                return;
+            }
+
+            // Save the script to the campaign before generating
+            try {
+                if (selectedCampaign) {
+                    await axios.put(`/api/campaigns/${selectedCampaign.id}`, {
+                        config: { ...wizardData, currentStep: 5 }
+                    });
+                }
+            } catch (err) {
+                console.warn("Final save failed", err);
+            }
+
+            setIsGenerating(true);
+            try {
+                // 2. Call API to generate blueprint
+                const res = await axios.post('/api/generate-blueprint', {
+                    company_name: 'TechCompany', // You could add this to wizard if needed
+                    job_role: wizardData.name,
+                    description: wizardData.script,
+                    candidate_count: wizardData.source.length,
+                    agent_persona: wizardData.agent,
+                    strictness: wizardData.strict,
+                    interview_mode: wizardData.mode,
+                    duration: 15
+                });
+
+                if (res.data) {
+                    setBlueprintData(res.data);
+                    setShowLaunchModal(true);
+                }
+            } catch (e) {
+                console.error("Blueprint generation failed", e);
+                // Fallback if API fails
+                setBlueprintData({
+                    system_prompt: wizardData.script,
+                    estimated_duration: "15 mins"
+                });
+                setShowLaunchModal(true);
+            } finally {
+                setIsGenerating(false);
+            }
         }
     };
 
@@ -303,7 +383,11 @@ const Campaigns = () => {
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Configure the Interview</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Choose the structure and strictness of the AI interviewer.</p>
                                         </div>
-                                        <InterviewStepsTab isWizard={true} setData={(mode) => setWizardData({ ...wizardData, mode })} />
+                                        <InterviewStepsTab
+                                            isWizard={true}
+                                            setData={(mode) => setWizardData({ ...wizardData, mode })}
+                                            initialMode={wizardData.mode}
+                                        />
                                     </>
                                 )}
 
@@ -314,7 +398,11 @@ const Campaigns = () => {
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Select your AI Recruiter</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Choose a persona and voice that matches your company culture.</p>
                                         </div>
-                                        <AgentSelector isWizard={true} setData={(data) => setWizardData({ ...wizardData, ...data })} />
+                                        <AgentSelector
+                                            isWizard={true}
+                                            setData={(data) => setWizardData({ ...wizardData, ...data })}
+                                            initialData={wizardData}
+                                        />
                                     </>
                                 )}
 
@@ -325,7 +413,11 @@ const Campaigns = () => {
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Job Context & Script</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Provide the Job Description so the AI knows what to look for.</p>
                                         </div>
-                                        <ScriptTab isWizard={true} setData={(script) => setWizardData({ ...wizardData, script })} />
+                                        <ScriptTab
+                                            isWizard={true}
+                                            setData={(script) => setWizardData({ ...wizardData, script })}
+                                            currentScript={wizardData.script}
+                                        />
                                     </>
                                 )}
                             </div>
@@ -339,12 +431,23 @@ const Campaigns = () => {
 
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 {currentStep < 5 ? (
-                                    <button className="btn-next" onClick={handleWizardNext}>
+                                    <button
+                                        className="btn-next"
+                                        onClick={handleWizardNext}
+                                        disabled={!isStepValid()}
+                                        style={{ opacity: isStepValid() ? 1 : 0.5, cursor: isStepValid() ? 'pointer' : 'not-allowed' }}
+                                    >
                                         {currentStep === 1 ? 'Create Campaign' : 'Next Step'} <i className="fa-solid fa-arrow-right"></i>
                                     </button>
                                 ) : (
-                                    <button className="btn-next btn-launch" onClick={handleWizardNext}>
-                                        <i className="fa-solid fa-rocket"></i> Launch Campaign
+                                    <button
+                                        className="btn-next btn-launch"
+                                        onClick={handleWizardNext}
+                                        disabled={isGenerating || !isStepValid()}
+                                        style={{ opacity: (!isGenerating && isStepValid()) ? 1 : 0.5, cursor: (!isGenerating && isStepValid()) ? 'pointer' : 'not-allowed' }}
+                                    >
+                                        {isGenerating ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
+                                        {isGenerating ? ' Generating...' : ' Generate Professional Blueprint'}
                                     </button>
                                 )}
                             </div>
@@ -356,11 +459,17 @@ const Campaigns = () => {
                         <header className="vapi-header">
                             <div className="header-left" style={{ display: 'flex', alignItems: 'center' }}>
                                 <h2>{selectedCampaign.name}</h2>
-                                <span className="status-badge">● {selectedCampaign.status}</span>
+                                <span className={`status-badge ${selectedCampaign.status === 'Active' ? 'active-status' : ''}`}>● {selectedCampaign.status}</span>
                             </div>
-                            <button className="btn-start">
-                                <i className="fa-solid fa-rocket"></i> Start Campaign
-                            </button>
+                            {selectedCampaign.status === 'Active' ? (
+                                <button className="btn-start stop-mode">
+                                    <i className="fa-solid fa-stop"></i> Stop Campaign
+                                </button>
+                            ) : (
+                                <button className="btn-start">
+                                    <i className="fa-solid fa-rocket"></i> Start Campaign
+                                </button>
+                            )}
                         </header>
 
                         {/* Tabs - Consolidated */}
@@ -425,58 +534,71 @@ const Campaigns = () => {
                 )}
             </main>
 
-            {/* Launch Modal */}
-            {
-                showLaunchModal && (
-                    <div className="modal-overlay">
-                        <div className="modal-content" style={{ maxWidth: '500px', width: '90%', textAlign: 'left' }}>
-                            <div className="modal-header">
-                                <h3>Ready to Launch?</h3>
-                                <button className="btn-close-modal" onClick={() => setShowLaunchModal(false)}>
-                                    <i className="fa-solid fa-xmark"></i>
-                                </button>
+            {/* Launch Modal - Full Screen Blueprint */}
+            {showLaunchModal && (
+                <div className="modal-overlay fullscreen">
+                    <div className="modal-content fullscreen-content">
+                        <div className="modal-header fullscreen-header">
+                            <h3>
+                                <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--primary-500)' }}></i>
+                                Campaign Blueprint Verification
+                            </h3>
+                            <button className="btn-close-modal" onClick={() => setShowLaunchModal(false)}>
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <div className="modal-body fullscreen-body">
+                            {/* Left: System Prompt */}
+                            <div className="blueprint-preview">
+                                <div style={{ marginBottom: '16px', color: 'var(--text-tertiary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                    // GENERATED SYSTEM PROMPT
+                                </div>
+                                {blueprintData?.system_prompt || wizardData.script}
                             </div>
-                            <div className="modal-body" style={{ padding: '20px 0' }}>
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>CAMPAIGN OVERVIEW</label>
-                                    <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{wizardData.name}</div>
+
+                            {/* Right: Stats & Action */}
+                            <div className="blueprint-sidebar">
+                                <div className="blueprint-stat-card">
+                                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Campaign Name</label>
+                                    <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-main)', marginBottom: '20px' }}>{wizardData.name}</div>
+
+                                    <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Candidates</label>
+                                    <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary-500)' }}>
+                                        {wizardData.source ? wizardData.source.length : 0}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Ready to queue</div>
                                 </div>
 
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>TOTAL CANDIDATES</label>
-                                    <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>
-                                        {wizardData.source ? wizardData.source.length : 0} Candidates
+                                <div className="blueprint-stat-card">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Est. Duration</span>
+                                        <span style={{ fontWeight: '600' }}>{blueprintData?.estimated_duration || "15 mins"} / call</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Agent Persona</span>
+                                        <span style={{ fontWeight: '600', textTransform: 'capitalize' }}>{wizardData.agent}</span>
                                     </div>
                                 </div>
 
-                                <div style={{ marginBottom: '16px' }}>
-                                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>SYSTEM PROMPT / JOB CONTEXT</label>
-                                    <div style={{
-                                        background: 'var(--bg-card-hover)',
-                                        padding: '12px',
-                                        borderRadius: '8px',
-                                        fontSize: '13px',
-                                        color: 'var(--text-secondary)',
-                                        maxHeight: '150px',
-                                        overflowY: 'auto'
-                                    }}>
-                                        {wizardData.script || "No specific script provided."}
-                                    </div>
+                                <div style={{ marginTop: 'auto', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', fontSize: '12px', color: '#ef4444' }}>
+                                    <i className="fa-solid fa-triangle-exclamation"></i> Warning: Launching will immediately initiate calls to {wizardData.source ? wizardData.source.length : 0} candidates.
                                 </div>
-                            </div>
-                            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                <button className="btn-cancel" onClick={() => setShowLaunchModal(false)} style={{ border: '1px solid var(--border-subtle)' }}>
-                                    Cancel
-                                </button>
-                                <button className="btn-next btn-launch" onClick={confirmLaunch}>
-                                    <i className="fa-solid fa-rocket"></i> Launch Now
-                                </button>
                             </div>
                         </div>
+
+                        <div className="modal-footer fullscreen-footer">
+                            <button className="btn-cancel" onClick={() => setShowLaunchModal(false)} style={{ border: '1px solid var(--border-subtle)', padding: '12px 24px' }}>
+                                Back to Edit
+                            </button>
+                            <button className="btn-next btn-launch" onClick={confirmLaunch} style={{ padding: '12px 32px', fontSize: '16px' }}>
+                                <i className="fa-solid fa-rocket"></i> Launch Campaign
+                            </button>
+                        </div>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -553,8 +675,8 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
 };
 
 // --- 2. Interview Steps Tab ---
-const InterviewStepsTab = ({ isWizard, setData }) => {
-    const [mode, setMode] = useState('technical');
+const InterviewStepsTab = ({ isWizard, setData, initialMode }) => {
+    const [mode, setMode] = useState(initialMode || 'technical');
 
     const handleSetMode = (m) => {
         setMode(m);
@@ -599,11 +721,11 @@ const InterviewStepsTab = ({ isWizard, setData }) => {
 };
 
 // --- 3. Agent Selector (AI Persona) ---
-const AgentSelector = ({ isWizard, setData }) => {
-    const [persona, setPersona] = useState('aanya');
-    const [voice, setVoice] = useState('raju');
-    const [lang, setLang] = useState('en-us');
-    const [strict, setStrict] = useState('balanced');
+const AgentSelector = ({ isWizard, setData, initialData }) => {
+    const [persona, setPersona] = useState(initialData?.agent || 'aanya');
+    const [voice, setVoice] = useState(initialData?.voice || 'raju');
+    const [lang, setLang] = useState(initialData?.lang || 'en-us');
+    const [strict, setStrict] = useState(initialData?.strict || 'balanced');
 
     // Helper to bubble up changes
     const update = (key, val) => {
@@ -733,7 +855,7 @@ const AgentSelector = ({ isWizard, setData }) => {
 };
 
 // --- 4. Script Tab ---
-const ScriptTab = ({ isWizard, setData }) => {
+const ScriptTab = ({ isWizard, setData, currentScript }) => {
     return (
         <div>
             <div className="script-banner">
@@ -746,7 +868,7 @@ const ScriptTab = ({ isWizard, setData }) => {
 
             <div className="section-head"><i className="fa-solid fa-building"></i> Company Identity</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                <input type="text" className="input-dark" placeholder="Company Name (e.g. TechFlow)" onChange={(e) => isWizard && setData && setData(e.target.value)} />
+                <input type="text" className="input-dark" placeholder="Company Name (e.g. TechFlow)" />
                 <input type="text" className="input-dark" placeholder="Industry (e.g. Fintech)" />
             </div>
 
@@ -754,11 +876,15 @@ const ScriptTab = ({ isWizard, setData }) => {
             <input type="text" className="input-dark" placeholder="Job Title (e.g. Senior Backend Engineer)" style={{ marginBottom: '20px' }} />
 
             <div className="section-head">Evaluation Context & Requirements</div>
-            <textarea className="input-dark" style={{ minHeight: '120px', resize: 'vertical' }} placeholder="Paste the JD or key requirements here..."></textarea>
+            <textarea
+                className="input-dark"
+                style={{ minHeight: '120px', resize: 'vertical' }}
+                placeholder="Paste the JD or key requirements here..."
+                value={currentScript || ''}
+                onChange={(e) => isWizard && setData && setData(e.target.value)}
+            ></textarea>
 
-            <button className="btn-gen-script">
-                <i className="fa-solid fa-bolt"></i> Generate Professional Blueprint
-            </button>
+
         </div>
     );
 };
