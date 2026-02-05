@@ -7,24 +7,58 @@ const Campaigns = () => {
     const [selectedCampaign, setSelectedCampaign] = useState(null);
     const [activeTab, setActiveTab] = useState('agent'); // Default can be agent
 
-    // Mock Data for "My Campaign" if API fails or is empty, to verify UI
+    // Fetch campaigns from backend
+    const fetchCampaigns = async () => {
+        try {
+            const res = await axios.get('/api/campaigns');
+            if (res.data && res.data.campaigns) {
+                setCampaigns(res.data.campaigns);
+                // Select first if none selected
+                if (!selectedCampaign && res.data.campaigns.length > 0) {
+                    setSelectedCampaign(res.data.campaigns[0]);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching campaigns:", error);
+        }
+    };
+
     useEffect(() => {
-        // Load campaigns
-        const mockCampaigns = [
-            { id: '69835358', name: 'My campaign', status: 'In Design' },
-            { id: '69561968', name: 'DEmo', status: 'Draft' },
-            { id: '695617d4', name: 'My work', status: 'Completed' }
-        ];
-        setCampaigns(mockCampaigns);
-        setSelectedCampaign(mockCampaigns[0]);
+        fetchCampaigns();
     }, []);
 
-    const handleCreateCampaign = () => {
+    const handleCreateCampaign = async () => {
         const name = prompt("Enter Campaign Name:");
         if (name) {
-            const newCamp = { id: Date.now().toString(), name, status: 'Draft' };
-            setCampaigns([newCamp, ...campaigns]);
-            setSelectedCampaign(newCamp);
+            try {
+                // Optimistic update or refetch
+                await axios.post('/api/campaigns/create', { name, type: 'audio' });
+                fetchCampaigns();
+            } catch (error) {
+                console.error("Error creating campaign:", error);
+                alert("Failed to create campaign");
+            }
+        }
+    };
+
+    const handleDeleteCampaign = async (e, id) => {
+        e.stopPropagation(); // Prevent selecting the campaign while deleting
+        if (window.confirm("Are you sure you want to delete this campaign? This cannot be undone.")) {
+            try {
+                await axios.delete(`/api/campaigns/${id}`);
+
+                // Update local state
+                const updatedList = campaigns.filter(c => c.id !== id);
+                setCampaigns(updatedList);
+
+                // If currently selected was deleted, select another one
+                if (selectedCampaign && selectedCampaign.id === id) {
+                    setSelectedCampaign(updatedList.length > 0 ? updatedList[0] : null);
+                }
+            } catch (error) {
+                console.error("Error deleting campaign:", error);
+                alert("Failed to delete campaign");
+            }
         }
     };
 
@@ -53,9 +87,20 @@ const Campaigns = () => {
                             key={camp.id}
                             className={`nav-item ${selectedCampaign?.id === camp.id ? 'active' : ''}`}
                             onClick={() => setSelectedCampaign(camp)}
+                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}
                         >
-                            <div className="nav-item-title">{camp.name}</div>
-                            <div className="nav-item-meta">#{camp.id.substring(0, 8)}</div>
+                            <div style={{ overflow: 'hidden' }}>
+                                <div className="nav-item-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.name}</div>
+                                <div className="nav-item-meta">#{camp.id.substring(0, 8)}</div>
+                            </div>
+
+                            <button
+                                className="btn-delete-camp"
+                                onClick={(e) => handleDeleteCampaign(e, camp.id)}
+                                title="Delete Campaign"
+                            >
+                                <i className="fa-solid fa-trash"></i>
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -109,8 +154,20 @@ const Campaigns = () => {
                         </div>
                     </>
                 ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                        Select a campaign
+                    <div className="empty-state-container">
+                        <div className="empty-state-icon-wrapper">
+                            <div className="empty-state-blob"></div>
+                            <div className="empty-state-icon">
+                                <i className="fa-solid fa-wand-magic-sparkles"></i>
+                            </div>
+                        </div>
+                        <h2 className="empty-state-title">No Campaign Selected</h2>
+                        <p className="empty-state-desc">
+                            Select a campaign from the sidebar to view details, or create a new one to start your AI calling journey.
+                        </p>
+                        <div className="empty-state-arrow">
+                            <i className="fa-solid fa-arrow-left-long"></i> Select from sidebar
+                        </div>
                     </div>
                 )}
             </main>
