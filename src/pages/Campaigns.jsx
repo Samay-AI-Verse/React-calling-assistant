@@ -419,6 +419,7 @@ const Campaigns = () => {
                                             isWizard={true}
                                             initialData={wizardData.source}
                                             setData={(data) => setWizardData({ ...wizardData, source: data })}
+                                            showToast={showToast}
                                         />
                                     </>
                                 )}
@@ -541,6 +542,18 @@ const Campaigns = () => {
                                 <SourceDataTab
                                     campaignId={selectedCampaign.id}
                                     initialData={selectedCampaign.config?.source || []}
+                                    onSave={async (newCandidates) => {
+                                        try {
+                                            const updatedConfig = { ...selectedCampaign.config, source: newCandidates };
+                                            await axios.put(`/api/campaigns/${selectedCampaign.id}`, { config: updatedConfig });
+                                            setSelectedCampaign(prev => ({ ...prev, config: updatedConfig }));
+                                            showToast("Candidate list updated successfully", "success");
+                                        } catch (error) {
+                                            console.error("Error saving candidates:", error);
+                                            showToast("Failed to save candidates", "error");
+                                        }
+                                    }}
+                                    showToast={showToast}
                                 />
                             )}
                             {activeTab === 'reports' && <ReportsTab />}
@@ -659,13 +672,19 @@ const Campaigns = () => {
 };
 
 // --- 1. Source Data Tab ---
-const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
+// --- 1. Source Data Tab ---
+const SourceDataTab = ({ campaignId, isWizard, setData, initialData, onSave, showToast }) => {
     const [candidates, setCandidates] = useState(initialData || []);
 
     // Manual State
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
+
+    // Update local state when initialData changes (for switching campaigns)
+    useEffect(() => {
+        setCandidates(initialData || []);
+    }, [initialData]);
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
@@ -677,6 +696,8 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const rawData = utils.sheet_to_json(worksheet);
 
+            let skippedCount = 0;
+
             const mappedData = rawData.map(row => {
                 const keys = Object.keys(row);
                 // Simple heuristic to find fields case-insensitively
@@ -684,17 +705,36 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
                 const phoneKey = keys.find(k => /(phone|mobile|cell|contact)/i.test(k));
                 const emailKey = keys.find(k => /email/i.test(k));
 
+                // STRICT: Phone Number is mandatory
+                if (!phoneKey || !row[phoneKey]) {
+                    skippedCount++;
+                    return null;
+                }
+
                 return {
                     name: nameKey ? row[nameKey] : '',
-                    phone: phoneKey ? row[phoneKey] : '',
+                    phone: row[phoneKey], // Phone is guaranteed here
                     email: emailKey ? row[emailKey] : ''
                 };
-            }).filter(item => item.name || item.phone || item.email);
+            }).filter(item => item !== null);
 
             if (mappedData.length > 0) {
                 const newList = [...candidates, ...mappedData];
                 setCandidates(newList);
                 if (isWizard && setData) setData(newList);
+
+                // USER REQUEST: Auto-save immediately after upload if editing
+                if (!isWizard && onSave) {
+                    onSave(newList);
+                }
+
+                if (skippedCount > 0) {
+                    if (showToast) showToast(`Imported ${mappedData.length} candidates. Skipped ${skippedCount} items (missing phone).`, "warning");
+                } else {
+                    if (showToast) showToast(`Successfully imported ${mappedData.length} candidates.`, "success");
+                }
+            } else {
+                if (showToast) showToast("No valid candidates found. Ensure 'Phone' column exists.", "error");
             }
         } catch (error) {
             console.error("Error parsing file:", error);
@@ -708,7 +748,20 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
             setCandidates(newList);
             setName(''); setPhone(''); setEmail('');
             if (isWizard && setData) setData(newList);
+        } else {
+            if (showToast && !phone) showToast("Phone number is required", "error");
         }
+    };
+
+    const handleDelete = (index) => {
+        const newList = [...candidates];
+        newList.splice(index, 1);
+        setCandidates(newList);
+        if (isWizard && setData) setData(newList);
+    };
+
+    const handleSave = () => {
+        if (onSave) onSave(candidates);
     };
 
     return (
@@ -748,29 +801,46 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
 
             <div className="manual-grid">
                 <input className="input-dark" placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} />
-                <input className="input-dark" placeholder="Phone Number" value={phone} onChange={e => setPhone(e.target.value)} />
+                <input className="input-dark" placeholder="Phone Number (Required)" value={phone} onChange={e => setPhone(e.target.value)} />
                 <input className="input-dark" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} />
                 <button className="btn-add" onClick={handleAdd}><i className="fa-solid fa-plus"></i> Add</button>
             </div>
 
-            <div className="section-head">TARGET CANDIDATES ({candidates.length})</div>
+            <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>TARGET CANDIDATES ({candidates.length})</span>
+                {!isWizard && (
+                    <button className="btn-save-candidates" onClick={handleSave}>
+                        <i className="fa-solid fa-save"></i> Save List
+                    </button>
+                )}
+            </div>
             <table className="data-table">
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>Phone</th>
                         <th>Email</th>
+                        <th style={{ width: '50px' }}></th>
                     </tr>
                 </thead>
                 <tbody>
                     {candidates.length === 0 ? (
-                        <tr><td colSpan="3" style={{ textAlign: 'center', padding: '30px', color: '#52525b' }}>No candidates added yet.</td></tr>
+                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: '#52525b' }}>No candidates added yet.</td></tr>
                     ) : (
                         candidates.map((c, i) => (
-                            <tr key={i}>
+                            <tr key={i} className="candidate-row">
                                 <td>{c.name}</td>
                                 <td>{c.phone}</td>
                                 <td>{c.email}</td>
+                                <td style={{ textAlign: 'center' }}>
+                                    <button
+                                        className="btn-row-delete"
+                                        onClick={() => handleDelete(i)}
+                                        title="Delete Candidate"
+                                    >
+                                        <i className="fa-solid fa-trash" style={{ color: '#ef4444' }}></i>
+                                    </button>
+                                </td>
                             </tr>
                         ))
                     )}
