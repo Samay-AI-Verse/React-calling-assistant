@@ -63,6 +63,7 @@ const Settings = () => {
                             <span className="badge badge-success" style={{ fontSize: '11px', padding: '4px 10px' }}>Verified</span>
                         </div>
                     </div>
+
                 </div>
 
                 <button className="btn" style={{

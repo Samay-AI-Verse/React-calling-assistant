@@ -2,73 +2,65 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
 :root {
-    /* --- Theme: Dark Mode + Professional Blue Primary --- */
+    /* --- Theme: Light Mode (Foundation) --- */
 
-    /* Primary Accents (Professional Blue) */
-    /* Used for: Main Buttons, Active Sidebar Links, Focus Rings */
-    --primary-50: rgba(59, 130, 246, 0.1);
-    /* Blue Tint */
-    --primary-100: rgba(59, 130, 246, 0.15);
-    --primary-400: #60a5fa;
-    /* Light Blue (Text/Highlights) */
-    --primary-500: #3b82f6;
-    /* MAIN BLUE (Button Background) */
-    --primary-600: #2563eb;
-    /* Deep Blue (Hover State) */
+    /* Primary Brand Color (The Blue) */
+    --primary-50: #EDF5FD;
+    --primary-100: #D0E4F9;
+    --primary-400: #5D9CEC;
+    --primary-500: #2B78C5;
+    /* Action Blue */
+    --primary-600: #205D9E;
+    /* Darker for hover */
 
-    /* Neutrals (Zinc / Matte Dark) - Kept original */
-    --gray-50: #000000;
-    --gray-100: #09090b;
-    /* Main Body Background */
-    --gray-200: #141417;
-    /* Card Background */
-    --gray-300: #18181b;
-    /* Input/Hover Background */
-    --gray-400: #27272a;
-    /* Borders */
-    --gray-500: #52525b;
-    /* Icons */
-    --gray-600: #a1a1aa;
-    /* Secondary Text */
-    --gray-700: #d4d4d8;
-    --gray-800: #f4f4f5;
-    --gray-900: #ffffff;
-    /* Primary Text */
+    /* Neutrals / Grays */
+    --white: #FFFFFF;
+    --gray-50: #F8F9FA;
+    /* Background White */
+    --gray-100: #F1F3F5;
+    --gray-200: #E9ECEF;
+    /* Soft Gray */
+    --gray-300: #DEE2E6;
+    /* Soft Gray */
+    --gray-400: #CED4DA;
+    --gray-500: #ADB5BD;
+    --gray-600: #6C757D;
+    /* Text Secondary */
+    --gray-700: #495057;
+    --gray-800: #343A40;
+    --gray-900: #212529;
+    /* Text Primary */
 
-    /* Semantic Colors */
-    --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.15);
-    --success-text: #34d399;
+    /* Functional Accents */
+    --success: #27AE60;
+    /* Success Green - Start Campaign */
+    --success-bg: rgba(39, 174, 96, 0.15);
+    --success-text: #27AE60;
 
-    /* Warning is now Yellow/Gold */
-    --warning: #eab308;
-    --warning-bg: rgba(234, 179, 8, 0.15);
-    --warning-text: #facc15;
+    --warning: #F1C40F;
+    --warning-bg: rgba(241, 196, 15, 0.15);
+    --warning-text: #D4AC0D;
 
-    --danger: #ef4444;
-    --danger-bg: rgba(239, 68, 68, 0.15);
-    --danger-text: #f87171;
+    --danger: #E74C3C;
+    --danger-bg: rgba(231, 76, 60, 0.15);
+    --danger-text: #C0392B;
 
     /* Backgrounds */
-    --bg-body: var(--gray-100);
-    /* Deep Charcoal */
-    --bg-card: var(--gray-200);
-    /* Slightly lighter than body */
-    --bg-sidebar: var(--gray-100);
-    /* Seamless with body */
-    --bg-input: var(--gray-300);
-    --bg-hover: var(--gray-300);
+    --bg-body: #F8F9FA;
+    --bg-card: #FFFFFF;
+    --bg-sidebar: #FFFFFF;
+    --bg-input: #FFFFFF;
+    --bg-hover: #F1F3F5;
 
     /* Borders */
-    --border-subtle: var(--gray-400);
-    /* Subtle matte border */
-    --border-focus: var(--primary-500);
-    /* Focus color is now Blue */
+    --border-subtle: #27272a;
+    /* Darker border */
+    --border-focus: #2B78C5;
 
     /* Text */
-    --text-main: #ffffff;
-    --text-secondary: var(--gray-600);
-    --text-tertiary: var(--gray-500);
+    --text-main: #000000;
+    --text-secondary: #1a1a1a;
+    --text-tertiary: #404040;
 
     /* --- Spacing --- */
     --space-1: 4px;
@@ -79,9 +71,12 @@
     --space-6: 24px;
     --space-8: 32px;
 
+    /* LOGO ANIMATION VARS */
+    --logo-anim-duration: 3s;
+
     /* --- Shadows (Depth, not Glow) --- */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 
     /* --- Radius --- */
     --radius-sm: 4px;
@@ -95,16 +90,58 @@
     --duration-fast: 200ms;
     --duration-normal: 300ms;
 
-    /* VAPI VARS */
-    --vapi-bg-dark: #09090b;
-    --vapi-bg-panel: #09090b;
-    --vapi-border: #27272a;
-    --vapi-primary: #3b82f6;
-    /* Blue */
+    /* VAPI VARS - Mapped to Light Theme */
+    --vapi-bg-dark: #FFFFFF;
+    --vapi-bg-panel: #F8F9FA;
+    --vapi-border: #DEE2E6;
+    --vapi-primary: #2B78C5;
     --vapi-orange: #f97316;
     --vapi-yellow: #eab308;
     --vapi-blue: #3b82f6;
     --vapi-purple: #8b5cf6;
+}
+
+/* LOGO ANIMATIONS */
+@keyframes logoShine {
+    0% {
+        background-position: -200%;
+    }
+
+    100% {
+        background-position: 200%;
+    }
+}
+
+@keyframes accentPulse {
+
+    0%,
+    100% {
+        color: var(--primary-500);
+        transform: scale(1);
+    }
+
+    50% {
+        color: var(--primary-400);
+        transform: scale(1.1);
+    }
+}
+
+.sidebar-logo-anim {
+    position: relative;
+    display: inline-block;
+    background: linear-gradient(90deg, #000, #3b82f6, #000);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+    animation: logoShine 5s linear infinite;
+}
+
+.logo-accent {
+    display: inline-block;
+    color: var(--primary-500) !important;
+    animation: accentPulse 2s ease-in-out infinite;
+    -webkit-text-fill-color: var(--primary-500);
 }
 
 /* --- Reset & Base --- */
@@ -125,7 +162,7 @@ body {
     height: 100vh;
     overflow: hidden;
     font-size: 13px;
-    color-scheme: dark;
+    color-scheme: light;
 }
 
 /* Update the Heading block */
@@ -1223,7 +1260,7 @@ textarea.form-control {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    color: #fff;
+    color: var(--text-main);
 
 }
 
@@ -1256,11 +1293,11 @@ textarea.form-control {
 
 .vapi-search input {
     width: 100%;
-    background: #18181b;
+    background: var(--bg-input);
     border: 1px solid var(--vapi-border);
     padding: 8px 10px 8px 30px;
     border-radius: 6px;
-    color: white;
+    color: var(--text-main);
     font-size: 12px;
 }
 
@@ -1283,17 +1320,17 @@ textarea.form-control {
 }
 
 .vapi-list-item:hover {
-    background-color: #18181b;
+    background-color: var(--bg-hover);
 }
 
 .vapi-list-item.active {
-    background-color: #27272a;
-    border-color: #3f3f46;
+    background-color: var(--primary-50);
+    border-color: var(--primary-100);
 }
 
 .vapi-item-name {
     font-weight: 500;
-    color: white;
+    color: var(--text-main);
     display: block;
     font-size: 13px;
     margin-bottom: 4px;
@@ -1325,7 +1362,7 @@ textarea.form-control {
 
 .vapi-title h1 {
     font-size: 18px;
-    color: white;
+    color: var(--text-main);
     margin-bottom: 4px;
 }
 
@@ -1346,7 +1383,7 @@ textarea.form-control {
 .btn-vapi-ghost {
     background: transparent;
     border: 1px solid var(--vapi-border);
-    color: white;
+    color: var(--text-main);
     padding: 6px 12px;
     border-radius: 6px;
     font-size: 12px;
@@ -1358,7 +1395,7 @@ textarea.form-control {
 }
 
 .btn-vapi-ghost:hover {
-    background: #27272a;
+    background: var(--bg-hover);
 }
 
 .btn-vapi-filled {
@@ -1386,11 +1423,11 @@ textarea.form-control {
 }
 
 .vapi-tab:hover {
-    color: #fff;
+    color: var(--text-main);
 }
 
 .vapi-tab.active {
-    color: white;
+    color: var(--text-main);
     font-weight: 500;
 }
 
@@ -1415,7 +1452,7 @@ textarea.form-control {
 
 .vapi-stat-card {
     flex: 1;
-    background-color: #121212;
+    background-color: var(--bg-card);
     border: 1px solid var(--vapi-border);
     border-radius: 8px;
     padding: 20px;
@@ -1430,7 +1467,7 @@ textarea.form-control {
 }
 
 .vapi-stat-value {
-    color: white;
+    color: var(--text-main);
     font-weight: 600;
     font-size: 15px;
 }
@@ -1439,7 +1476,7 @@ textarea.form-control {
 .vapi-bar-track {
     width: 100%;
     height: 6px;
-    background: #27272a;
+    background: var(--bg-hover);
     border-radius: 4px;
     overflow: hidden;
     position: relative;
@@ -1481,11 +1518,11 @@ textarea.form-control {
 }
 
 .vapi-input-box {
-    background: #121212;
+    background: var(--bg-card);
     border: 1px solid var(--vapi-border);
     border-radius: 6px;
     padding: 10px 12px;
-    color: white;
+    color: var(--text-main);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1495,7 +1532,7 @@ textarea.form-control {
 }
 
 .vapi-input-box:hover {
-    border-color: #52525b;
+    border-color: var(--primary-500);
 }
 
 /* Floating AI Button */
@@ -1503,7 +1540,7 @@ textarea.form-control {
     position: absolute;
     bottom: 30px;
     right: 40px;
-    background: #1f2937;
+    background: var(--bg-card);
     border: 1px solid var(--vapi-border);
     border-radius: 30px;
     padding: 8px 16px;
@@ -1511,9 +1548,9 @@ textarea.form-control {
     align-items: center;
     gap: 12px;
     cursor: pointer;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     z-index: 10;
-    color: white;
+    color: var(--text-main);
     font-size: 13px;
 }
 
@@ -1569,8 +1606,8 @@ textarea.form-control {
 }
 
 .hr-btn-add {
-    background: #27272a;
-    color: white;
+    background: var(--gray-100);
+    color: var(--text-main);
     border: 1px solid var(--vapi-border);
     border-radius: 6px;
     padding: 8px 16px;
@@ -1582,7 +1619,7 @@ textarea.form-control {
 }
 
 .hr-btn-add:hover {
-    background: #3f3f46;
+    background: var(--bg-hover);
 }
 
 /* 3. Interview Round Cards */
@@ -1593,7 +1630,7 @@ textarea.form-control {
 }
 
 .round-option-card {
-    background: #121212;
+    background: var(--bg-card);
     border: 1px solid var(--vapi-border);
     border-radius: 8px;
     padding: 20px;

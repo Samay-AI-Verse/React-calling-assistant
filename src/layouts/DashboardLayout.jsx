@@ -36,13 +36,15 @@ const DashboardLayout = () => {
         fetchUser();
     }, []);
 
+    const showHeader = location.pathname.includes('/candidates');
+
     return (
         <div className="app-container">
             <Sidebar user={user} />
 
             <main className="main-wrapper">
-                {/* Header is hidden for Campaign Views in original logic */}
-                {!isCampaignView && (
+                {/* Header is ONLY visible for Candidates page */}
+                {showHeader && (
                     <header className="top-header header-bordered">
                         <div className="page-header">
                             <h2 id="page-title" className="page-title">{getPageTitle(location.pathname)}</h2>

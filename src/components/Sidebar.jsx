@@ -13,8 +13,8 @@ const Sidebar = ({ user }) => {
     return (
         <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
             <div className="brand" style={{ padding: '10px 12px', marginBottom: '24px', display: 'flex', alignItems: 'center' }}>
-                <div className="brand-text" style={{ fontSize: '22px', fontFamily: "'Outfit', sans-serif", fontWeight: 700, letterSpacing: '-0.03em', color: 'white' }}>
-                    ChetanaLabs
+                <div className="brand-text sidebar-logo-anim" style={{ fontSize: '22px', fontFamily: "'Outfit', sans-serif", fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-main)' }}>
+                    Chetana<span className="logo-accent">'Labs</span>
                 </div>
             </div>
 
