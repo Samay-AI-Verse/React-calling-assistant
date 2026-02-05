@@ -21,6 +21,9 @@ const Campaigns = () => {
         script: ''
     });
 
+    // Launch Modal State
+    const [showLaunchModal, setShowLaunchModal] = useState(false);
+
     // Fetch campaigns from backend
     const fetchCampaigns = async () => {
         try {
@@ -67,35 +70,88 @@ const Campaigns = () => {
         }
     };
 
+    const confirmLaunch = async () => {
+        if (!selectedCampaign) return;
+
+        try {
+            await axios.put(`/api/campaigns/${selectedCampaign.id}`, {
+                config: wizardData,
+                status: 'Active' // Launch status
+            });
+
+            await fetchCampaigns();
+            setIsCreating(false);
+            setShowLaunchModal(false);
+            setActiveTab('source');
+        } catch (error) {
+            console.error("Error launching campaign:", error);
+            alert("Failed to update campaign");
+        }
+    };
+
     const handleWizardNext = async () => {
-        if (currentStep === 1 && !wizardData.name) {
-            alert("Please enter a campaign name");
+        if (currentStep === 1) {
+            if (!wizardData.name) {
+                alert("Please enter a campaign name");
+                return;
+            }
+
+            // Check for duplicate name locally
+            const existing = campaigns.find(c => c.name.trim().toLowerCase() === wizardData.name.trim().toLowerCase());
+            if (existing) {
+                // USER REQUEST: Resume/Edit existing campaign instead of blocking
+                setSelectedCampaign(existing);
+                // Load existing config if available to ensure continuity
+                if (existing.config) {
+                    setWizardData(prev => ({ ...prev, ...existing.config, name: existing.name }));
+                }
+                setCurrentStep(currentStep + 1);
+                return;
+            }
+
+            // Create Campaign immediately
+            try {
+                // Determine status - 'In Design' for drafts
+                const res = await axios.post('/api/campaigns/create', {
+                    name: wizardData.name,
+                    type: 'audio',
+                    status: 'In Design',
+                    config: { ...wizardData, currentStep: currentStep + 1 } // Save next step
+                });
+
+                if (res.data && res.data.campaign) {
+                    await fetchCampaigns(); // Refresh list to show new campaign
+                    setSelectedCampaign(res.data.campaign); // Select it
+                    // Move to next step
+                    setCurrentStep(currentStep + 1);
+                }
+            } catch (error) {
+                console.error("Error creating campaign:", error);
+                alert("Failed to create campaign. Please try again.");
+            }
             return;
         }
 
         if (currentStep < 5) {
+            // Auto-save intermediate progress
+            try {
+                if (selectedCampaign) {
+                    const nextStep = currentStep + 1;
+                    const updatedConfig = { ...wizardData, currentStep: nextStep };
+
+                    await axios.put(`/api/campaigns/${selectedCampaign.id}`, {
+                        config: updatedConfig
+                    });
+                    // Update local state so if user exits, they see the new data
+                    setSelectedCampaign(prev => ({ ...prev, config: updatedConfig }));
+                }
+            } catch (err) {
+                console.warn("Auto-save failed", err);
+            }
             setCurrentStep(currentStep + 1);
         } else {
-            // FINISH - Create Campaign
-            try {
-                const res = await axios.post('/api/campaigns/create', {
-                    name: wizardData.name,
-                    type: 'audio',
-                    config: wizardData // Save all wizard config
-                });
-
-                await fetchCampaigns();
-                setIsCreating(false);
-                // Select the new campaign (assuming it's the first one in the updated list or we find it)
-                // ideally backend returns the new object, we can set it directly
-                if (res.data.campaign) {
-                    setSelectedCampaign(res.data.campaign);
-                }
-                setActiveTab('source'); // Reset to first tab
-            } catch (error) {
-                console.error("Error creating campaign:", error);
-                alert("Failed to create campaign");
-            }
+            // FINISH - Show Launch Popup
+            setShowLaunchModal(true);
         }
     };
 
@@ -132,12 +188,22 @@ const Campaigns = () => {
                         <div
                             key={camp.id}
                             className={`nav-item ${selectedCampaign?.id === camp.id ? 'active' : ''}`}
-                            onClick={() => { setSelectedCampaign(camp); setIsCreating(false); }}
+                            onClick={() => {
+                                setSelectedCampaign(camp);
+                                // Resume wizard if campaign is In Design
+                                if (camp.status === 'In Design' || (camp.config && camp.config.currentStep && camp.config.currentStep < 5)) {
+                                    setWizardData(camp.config || {});
+                                    setCurrentStep(camp.config?.currentStep || 2); // Default to step 2 if In Design but no step saved
+                                    setIsCreating(true);
+                                } else {
+                                    setIsCreating(false);
+                                }
+                            }}
                             style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}
                         >
                             <div style={{ overflow: 'hidden' }}>
                                 <div className="nav-item-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.name}</div>
-                                <div className="nav-item-meta">#{camp.id.substring(0, 8)}</div>
+                                {/* <div className="nav-item-meta">#{camp.id.substring(0, 8)}</div> */}
                             </div>
 
                             <button
@@ -194,9 +260,9 @@ const Campaigns = () => {
                             <div className="wizard-step-anim">
                                 {/* Step 1: Name */}
                                 {currentStep === 1 && (
-                                    <div style={{ maxWidth: '600px', margin: '40px auto' }}>
+                                    <div style={{ maxWidth: '600px', margin: '100px auto' }}>
                                         <h2 style={{ marginBottom: '12px', fontSize: '24px' }}>Let's start with a name</h2>
-                                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
+                                        <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
                                             What position or role are you hiring for? This helps categorize your interviews.
                                         </p>
                                         <div style={{ marginBottom: '24px' }}>
@@ -217,18 +283,23 @@ const Campaigns = () => {
                                 {/* Step 2: Source Data */}
                                 {currentStep === 2 && (
                                     <>
-                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                        <div style={{ marginBottom: '24px', textAlign: 'center', marginLeft: '10px' }}>
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Who should we call?</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Upload a CSV list of candidates or add them manually.</p>
                                         </div>
-                                        <SourceDataTab campaignId="temp" isWizard={true} setData={(data) => setWizardData({ ...wizardData, source: data })} />
+                                        <SourceDataTab
+                                            campaignId={selectedCampaign ? selectedCampaign.id : "temp"}
+                                            isWizard={true}
+                                            initialData={wizardData.source}
+                                            setData={(data) => setWizardData({ ...wizardData, source: data })}
+                                        />
                                     </>
                                 )}
 
                                 {/* Step 3: Flow */}
                                 {currentStep === 3 && (
                                     <>
-                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Configure the Interview</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Choose the structure and strictness of the AI interviewer.</p>
                                         </div>
@@ -239,7 +310,7 @@ const Campaigns = () => {
                                 {/* Step 4: Persona */}
                                 {currentStep === 4 && (
                                     <>
-                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Select your AI Recruiter</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Choose a persona and voice that matches your company culture.</p>
                                         </div>
@@ -250,7 +321,7 @@ const Campaigns = () => {
                                 {/* Step 5: Script */}
                                 {currentStep === 5 && (
                                     <>
-                                        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+                                        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
                                             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Job Context & Script</h2>
                                             <p style={{ color: 'var(--text-secondary)' }}>Provide the Job Description so the AI knows what to look for.</p>
                                         </div>
@@ -269,7 +340,7 @@ const Campaigns = () => {
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 {currentStep < 5 ? (
                                     <button className="btn-next" onClick={handleWizardNext}>
-                                        Next Step <i className="fa-solid fa-arrow-right"></i>
+                                        {currentStep === 1 ? 'Create Campaign' : 'Next Step'} <i className="fa-solid fa-arrow-right"></i>
                                     </button>
                                 ) : (
                                     <button className="btn-next btn-launch" onClick={handleWizardNext}>
@@ -310,7 +381,12 @@ const Campaigns = () => {
 
                         {/* Content */}
                         <div className="form-scroll-area">
-                            {activeTab === 'source' && <SourceDataTab campaignId={selectedCampaign.id} />}
+                            {activeTab === 'source' && (
+                                <SourceDataTab
+                                    campaignId={selectedCampaign.id}
+                                    initialData={selectedCampaign.config?.source || []}
+                                />
+                            )}
                             {activeTab === 'reports' && <ReportsTab />}
                             {activeTab === 'cost' && <CostTab />}
                             {activeTab === 'settings' && (
@@ -325,10 +401,7 @@ const Campaigns = () => {
                                         <AgentSelector />
                                     </div>
 
-                                    <div className="section-head">Script & Context</div>
-                                    <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-                                        <ScriptTab />
-                                    </div>
+
                                 </div>
                             )}
                         </div>
@@ -351,13 +424,65 @@ const Campaigns = () => {
                     </div>
                 )}
             </main>
-        </div>
+
+            {/* Launch Modal */}
+            {
+                showLaunchModal && (
+                    <div className="modal-overlay">
+                        <div className="modal-content" style={{ maxWidth: '500px', width: '90%', textAlign: 'left' }}>
+                            <div className="modal-header">
+                                <h3>Ready to Launch?</h3>
+                                <button className="btn-close-modal" onClick={() => setShowLaunchModal(false)}>
+                                    <i className="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <div className="modal-body" style={{ padding: '20px 0' }}>
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>CAMPAIGN OVERVIEW</label>
+                                    <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>{wizardData.name}</div>
+                                </div>
+
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>TOTAL CANDIDATES</label>
+                                    <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-main)' }}>
+                                        {wizardData.source ? wizardData.source.length : 0} Candidates
+                                    </div>
+                                </div>
+
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>SYSTEM PROMPT / JOB CONTEXT</label>
+                                    <div style={{
+                                        background: 'var(--bg-card-hover)',
+                                        padding: '12px',
+                                        borderRadius: '8px',
+                                        fontSize: '13px',
+                                        color: 'var(--text-secondary)',
+                                        maxHeight: '150px',
+                                        overflowY: 'auto'
+                                    }}>
+                                        {wizardData.script || "No specific script provided."}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button className="btn-cancel" onClick={() => setShowLaunchModal(false)} style={{ border: '1px solid var(--border-subtle)' }}>
+                                    Cancel
+                                </button>
+                                <button className="btn-next btn-launch" onClick={confirmLaunch}>
+                                    <i className="fa-solid fa-rocket"></i> Launch Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 
 // --- 1. Source Data Tab ---
-const SourceDataTab = ({ campaignId, isWizard, setData }) => {
-    const [candidates, setCandidates] = useState([]);
+const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
+    const [candidates, setCandidates] = useState(initialData || []);
 
     // Manual State
     const [name, setName] = useState('');

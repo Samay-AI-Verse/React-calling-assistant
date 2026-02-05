@@ -101,22 +101,32 @@
 }
 
 .nav-item.active {
-    background: var(--primary-50);
+    background: linear-gradient(90deg, var(--primary-50) 0%, white 100%);
     border-left: 3px solid var(--primary-500);
+    box-shadow: 0 1px 3px rgba(43, 120, 197, 0.1);
+}
+
+.nav-item.active .nav-item-title {
+    color: var(--primary-600);
+    font-weight: 600;
 }
 
 .nav-item-title {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--text-main);
-    margin-bottom: 2px;
+    margin-bottom: 0;
+    /* Adjusted since ID is hidden */
 }
 
 .nav-item-meta {
     font-size: 11px;
     color: var(--text-tertiary);
+    display: none;
+    /* Hide ID as per request via CSS as well */
 }
 
+/* ... existing button styles ... */
 .btn-delete-camp {
     opacity: 0;
     visibility: hidden;
@@ -504,20 +514,26 @@
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-subtle);
 }
 
 .data-table th {
     text-align: left;
-    padding: 12px;
-    color: var(--text-tertiary);
-    font-size: 11px;
-    font-weight: 600;
+    padding: 14px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
     text-transform: uppercase;
+    background: var(--bg-hover);
     border-bottom: 1px solid var(--border-subtle);
 }
 
 .data-table td {
-    padding: 14px 12px;
+    padding: 14px;
     font-size: 13px;
     color: var(--text-main);
     border-bottom: 1px solid var(--border-subtle);
@@ -704,7 +720,7 @@
 }
 
 .wizard-header {
-    padding: 20px 40px;
+    padding: 16px 32px;
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     justify-content: space-between;
@@ -742,7 +758,7 @@
 
 /* Progress Bar */
 .wizard-progress-bar {
-    padding: 0 40px;
+    padding: 0 32px;
     margin-top: -1px;
     /* Overlap border */
     background: var(--bg-body);
@@ -752,7 +768,7 @@
 .progress-track {
     display: flex;
     gap: 40px;
-    padding: 16px 0;
+    padding: 12px 0;
     overflow-x: auto;
 }
 
@@ -766,8 +782,8 @@
     white-space: nowrap;
     transition: all 0.3s;
     position: relative;
-    padding-bottom: 14px;
-    margin-bottom: -17px;
+    padding-bottom: 10px;
+    margin-bottom: -13px;
     /* Align with border */
     border-bottom: 2px solid transparent;
     cursor: default;
@@ -814,35 +830,40 @@
 .wizard-content-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 40px 10%;
-    /* Center content visually with padding */
+    padding: 32px 20px;
+    display: flex;
+    justify-content: center;
 }
 
 .wizard-step-anim {
     animation: slideUpShort 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    max-width: 900px;
-    /* Constrain width for readability on large screens */
+    width: 100%;
+    max-width: 720px;
+    /* Tighter container to reduce side gaps */
     margin: 0 auto;
 }
 
 /* Footer Actions */
 .wizard-footer {
-    padding: 20px 40px;
+    padding: 16px 32px;
     border-top: 1px solid var(--border-subtle);
     background: var(--bg-card);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    height: 70px;
 }
 
 .btn-back {
     color: var(--text-secondary);
     background: transparent;
     border: 1px solid var(--border-subtle);
-    padding: 10px 24px;
+    padding: 8px 20px;
+    /* Smaller button */
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
+    font-size: 13px;
     transition: all 0.2s;
 }
 
@@ -855,9 +876,11 @@
     background: var(--primary-500);
     color: white;
     border: none;
-    padding: 12px 32px;
+    padding: 10px 24px;
+    /* Smaller button */
     border-radius: 8px;
     font-weight: 600;
+    font-size: 13px;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
     display: flex;
@@ -882,15 +905,16 @@
     box-shadow: 0 6px 20px rgba(126, 34, 206, 0.5);
 }
 
-/* Input refinements */
+/* Input refinements - Compact */
 .wizard-step-anim input.input-dark,
 .wizard-step-anim textarea.input-dark {
     background: var(--bg-input);
-    /* Ensure consistent bg */
     border: 1px solid var(--border-subtle);
-    padding: 16px;
-    font-size: 15px;
-    /* Slightly larger text */
+    padding: 12px 14px;
+    /* Reduced padding */
+    font-size: 14px;
+    /* Smaller font */
+    border-radius: 8px;
 }
 
 .wizard-step-anim input.input-dark:focus,
@@ -899,11 +923,12 @@
     box-shadow: 0 0 0 2px var(--primary-50);
 }
 
-/* Upload zone override for wizard */
+/* Upload zone override for wizard - Compact */
 .wizard-upload-zone {
     border: 2px dashed var(--border-subtle);
-    border-radius: 12px;
-    padding: 60px;
+    border-radius: 10px;
+    padding: 40px;
+    /* Reduced padding */
     background: var(--bg-hover);
     display: flex;
     flex-direction: column;
@@ -912,12 +937,33 @@
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s;
+    font-size: 13px;
 }
 
 .wizard-upload-zone:hover {
     border-color: var(--primary-500);
     background: var(--primary-50);
     color: var(--primary-600);
+}
+
+/* Responsive Wizard adjustments */
+@media (max-width: 768px) {
+
+    .wizard-header,
+    .wizard-footer,
+    .wizard-progress-bar {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .wizard-content-scroll {
+        padding: 20px 16px;
+    }
+
+    .manual-grid {
+        grid-template-columns: 1fr;
+        /* Stack inputs on mobile */
+    }
 }
 
 @keyframes slideUpShort {
