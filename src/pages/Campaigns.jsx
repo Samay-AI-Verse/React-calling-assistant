@@ -26,14 +26,28 @@ const Campaigns = () => {
     const [blueprintData, setBlueprintData] = useState(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Toast State
+    const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
+
+    const showToast = (message, type = 'info') => {
+        setToast({ show: true, message, type });
+        setTimeout(() => setToast({ ...toast, show: false }), 3000);
+    };
+
     // Fetch campaigns from backend
     const fetchCampaigns = async () => {
         try {
             const res = await axios.get('/api/campaigns');
             if (res.data && res.data.campaigns) {
                 setCampaigns(res.data.campaigns);
-                // Select first if none selected and not creating
-                if (!selectedCampaign && res.data.campaigns.length > 0 && !isCreating) {
+
+                // If we have a selected campaign, refresh its data from the new list
+                if (selectedCampaign) {
+                    const found = res.data.campaigns.find(c => c.id === selectedCampaign.id);
+                    if (found) setSelectedCampaign(found);
+                }
+                // Else select first if none selected and not creating
+                else if (res.data.campaigns.length > 0 && !isCreating) {
                     setSelectedCampaign(res.data.campaigns[0]);
                 }
             }
@@ -67,7 +81,7 @@ const Campaigns = () => {
                 }
             } catch (error) {
                 console.error("Error deleting campaign:", error);
-                alert("Failed to delete campaign");
+                showToast("Failed to delete campaign", "error");
             }
         }
     };
@@ -90,10 +104,15 @@ const Campaigns = () => {
             setIsCreating(false);
             setShowLaunchModal(false);
             setActiveTab('source');
-            alert("Campaign Launched! Calls are being initiated.");
+            showToast("Campaign Launched! Calls are being initiated.", "success");
+
+            // Force update local status immediately to avoid UI lag
+            if (selectedCampaign) {
+                setSelectedCampaign(prev => ({ ...prev, status: 'Active' }));
+            }
         } catch (error) {
             console.error("Error launching campaign:", error);
-            // Fallback: If launch endpoint fails (e.g. Vapi not configured), just mark active
+            // Fallback
             try {
                 await axios.put(`/api/campaigns/${selectedCampaign.id}`, {
                     config: wizardData,
@@ -101,9 +120,12 @@ const Campaigns = () => {
                 });
                 setIsCreating(false);
                 setShowLaunchModal(false);
-                alert("Campaign Marked Active (Call initiation failed - check console/backend)");
+                showToast("Campaign Marked Active (Call init failed)", "warning");
+                if (selectedCampaign) {
+                    setSelectedCampaign(prev => ({ ...prev, status: 'Active' }));
+                }
             } catch (e) {
-                alert("Failed to update campaign status");
+                showToast("Failed to update campaign status", "error");
             }
         }
     };
@@ -120,13 +142,13 @@ const Campaigns = () => {
 
     const handleWizardNext = async () => {
         if (!isStepValid()) {
-            alert("Please complete the required fields before proceeding.");
+            showToast("Please complete the required fields.", "error");
             return;
         }
 
         if (currentStep === 1) {
             if (!wizardData.name) {
-                alert("Please enter a campaign name");
+                showToast("Please enter a campaign name", "error");
                 return;
             }
 
@@ -161,7 +183,7 @@ const Campaigns = () => {
                 }
             } catch (error) {
                 console.error("Error creating campaign:", error);
-                alert("Failed to create campaign. Please try again.");
+                showToast("Failed to create campaign.", "error");
             }
             return;
         }
@@ -188,7 +210,7 @@ const Campaigns = () => {
 
             // 1. Validation
             if (!isStepValid()) {
-                alert("Please paste the Job Description or Script.");
+                showToast("Please paste the JD or Script.", "error");
                 return;
             }
 
@@ -538,6 +560,7 @@ const Campaigns = () => {
             {showLaunchModal && (
                 <div className="modal-overlay fullscreen">
                     <div className="modal-content fullscreen-content">
+                        {/* ... Modal Code ... */}
                         <div className="modal-header fullscreen-header">
                             <h3>
                                 <i className="fa-solid fa-wand-magic-sparkles" style={{ color: 'var(--primary-500)' }}></i>
@@ -596,6 +619,14 @@ const Campaigns = () => {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast.show && (
+                <div className={`toast-notification ${toast.type}`}>
+                    <i className={`fa-solid ${toast.type === 'success' ? 'fa-check-circle' : toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle'}`}></i>
+                    {toast.message}
                 </div>
             )}
         </div>
@@ -675,12 +706,19 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
 };
 
 // --- 2. Interview Steps Tab ---
-const InterviewStepsTab = ({ isWizard, setData, initialMode }) => {
-    const [mode, setMode] = useState(initialMode || 'technical');
+const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
+    const [mode, setMode] = useState(initialData?.mode || 'technical');
+    const [duration, setDuration] = useState(initialData?.duration || '15 Mins');
 
-    const handleSetMode = (m) => {
-        setMode(m);
-        if (isWizard && setData) setData(m);
+    const update = (key, val) => {
+        if (key === 'mode') {
+            setMode(val);
+            if (isWizard && setData) setData({ mode: val, duration });
+        }
+        if (key === 'duration') {
+            setDuration(val);
+            if (isWizard && setData) setData({ mode, duration: val });
+        }
     };
 
     return (
@@ -688,19 +726,19 @@ const InterviewStepsTab = ({ isWizard, setData, initialMode }) => {
             {!isWizard && <div className="section-head">1. INTERVIEW MODE</div>}
             <div className="grid-steps">
                 {/* Technical */}
-                <div className={`step-card ${mode === 'technical' ? 'active' : ''}`} onClick={() => handleSetMode('technical')}>
+                <div className={`step-card ${mode === 'technical' ? 'active' : ''}`} onClick={() => update('mode', 'technical')}>
                     <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, #ef4444, #7f1d1d)' }}></div>
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>Technical</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Coding & System Design</div>
                 </div>
                 {/* HR */}
-                <div className={`step-card ${mode === 'hr' ? 'active' : ''}`} onClick={() => handleSetMode('hr')}>
+                <div className={`step-card ${mode === 'hr' ? 'active' : ''}`} onClick={() => update('mode', 'hr')}>
                     <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, #eab308, #713f12)' }}></div>
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>HR Round</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Culture & Soft Skills</div>
                 </div>
                 {/* Mixed */}
-                <div className={`step-card ${mode === 'mixed' ? 'active' : ''}`} onClick={() => handleSetMode('mixed')}>
+                <div className={`step-card ${mode === 'mixed' ? 'active' : ''}`} onClick={() => update('mode', 'mixed')}>
                     <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, cyan, #0e7490)' }}></div>
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>Mixed</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>50% Tech + 50% HR</div>
@@ -710,10 +748,13 @@ const InterviewStepsTab = ({ isWizard, setData, initialMode }) => {
             <div className="section-head">2. DURATION</div>
             <div style={{ display: 'flex', gap: '12px' }}>
                 {['15 Mins', '20 Mins', '30 Mins', '45 Mins'].map(t => (
-                    <button key={t} style={{
-                        background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)',
-                        padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px'
-                    }}>{t}</button>
+                    <button
+                        key={t}
+                        onClick={() => update('duration', t)}
+                        className={`duration-btn ${duration === t ? 'active' : ''}`}
+                    >
+                        {t}
+                    </button>
                 ))}
             </div>
         </div>
