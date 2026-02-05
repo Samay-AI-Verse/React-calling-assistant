@@ -1,69 +1,88 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 
 const VideoAssistant = () => {
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        const createStars = (numStars, minSpeed, maxSpeed) => {
-            const container = containerRef.current;
-            if (!container) return;
-            container.innerHTML = ''; // Clear
-
-            for (let i = 0; i < numStars; i++) {
-                const star = document.createElement('div');
-                star.className = 'star';
-
-                // Random position
-                const x = Math.random() * 100;
-                const y = Math.random() * 100;
-                star.style.left = `${x}%`;
-                star.style.top = `${y}%`;
-                star.style.position = 'absolute';
-                star.style.backgroundColor = 'white';
-                star.style.borderRadius = '50%';
-
-                // Random size
-                const size = Math.random() * 3 + 1;
-                star.style.width = `${size}px`;
-                star.style.height = `${size}px`;
-
-                // Animation
-                const duration = Math.random() * (maxSpeed - minSpeed) + minSpeed;
-                const delay = Math.random() * (minSpeed * 0.5);
-
-                star.style.animation = `twinkle ${duration}s infinite ${delay}s ease-in-out alternate`;
-                star.style.opacity = Math.random();
-
-                container.appendChild(star);
-            }
-        };
-
-        createStars(200, 2, 5);
-    }, []);
-
     return (
-        <div id="video-assistant" className="view-section active" style={{ height: '100%', position: 'relative', overflow: 'hidden', background: 'radial-gradient(circle at center, #1b0f19 0%, #000000 100%)' }}>
-            <style>{`
-                @keyframes twinkle {
-                    0% { opacity: 0.2; transform: scale(0.8); }
-                    100% { opacity: 1; transform: scale(1.2); }
-                }
-            `}</style>
+        <div id="video-assistant" className="view-section active" style={{
+            height: '100%',
+            position: 'relative',
+            overflow: 'hidden',
+            background: 'var(--bg-body)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center'
+        }}>
 
-            <div className="stars-background" ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-                {/* Stars injected here */}
-            </div>
+            {/* Background Decoration */}
+            <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '600px',
+                height: '600px',
+                background: 'radial-gradient(circle, var(--primary-100) 0%, transparent 70%)',
+                opacity: 0.5,
+                zIndex: 0
+            }}></div>
 
-            <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'white', textAlign: 'center' }}>
-                <div style={{ fontSize: '64px', marginBottom: '20px', color: 'var(--primary-500)' }}>
+            <div style={{ position: 'relative', zIndex: 10, maxWidth: '600px', padding: '0 20px' }}>
+                <div style={{
+                    fontSize: '64px',
+                    marginBottom: '24px',
+                    color: 'var(--primary-500)',
+                    background: 'var(--primary-50)',
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 24px auto',
+                    boxShadow: '0 0 0 8px var(--bg-card)'
+                }}>
                     <i className="fa-solid fa-video"></i>
                 </div>
-                <h1 style={{ fontSize: '32px', marginBottom: '10px' }}>Video Assistant</h1>
-                <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '500px' }}>
-                    Visual AI Interviewer capabilities are currently under development.
-                    Expect high-fidelity avatars and realtime emotion analysis soon.
+
+                <h1 style={{
+                    fontSize: '32px',
+                    marginBottom: '12px',
+                    fontWeight: 700,
+                    color: 'var(--text-main)'
+                }}>Video Assistant</h1>
+
+                <p style={{
+                    fontSize: '16px',
+                    color: 'var(--text-secondary)',
+                    lineHeight: '1.6',
+                    marginBottom: '32px'
+                }}>
+                    Our high-fidelity visual AI interviewer is currently in the lab. <br />
+                    We are fine-tuning realtime emotion analysis and avatar responsiveness.
                 </p>
-                <div className="badge badge-primary" style={{ marginTop: '20px', padding: '8px 16px', fontSize: '14px' }}>
+
+                <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '20px',
+                    color: 'var(--primary-600)',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    boxShadow: 'var(--shadow-sm)'
+                }}>
+                    <span style={{
+                        width: '8px',
+                        height: '8px',
+                        background: 'var(--primary-500)',
+                        borderRadius: '50%',
+                        display: 'block',
+                        boxShadow: '0 0 0 2px var(--primary-100)'
+                    }}></span>
                     Coming Soon
                 </div>
             </div>

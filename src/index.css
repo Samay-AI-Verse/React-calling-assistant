@@ -844,9 +844,10 @@ textarea.form-control {
 }
 
 /* style.css around line 700 */
+/* style.css around line 700 */
 .view-section {
-
-    /* Animation removed from here */
+    width: 100%;
+    height: 100%;
 }
 
 /*
