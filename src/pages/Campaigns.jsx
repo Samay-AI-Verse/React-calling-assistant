@@ -410,10 +410,7 @@ const Campaigns = () => {
                                 {/* Step 2: Source Data */}
                                 {currentStep === 2 && (
                                     <>
-                                        <div style={{ marginBottom: '24px', textAlign: 'center', marginLeft: '10px' }}>
-                                            <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Who should we call?</h2>
-                                            <p style={{ color: 'var(--text-secondary)' }}>Upload a CSV list of candidates or add them manually.</p>
-                                        </div>
+                                        {/* REMOVED: "Who should we call?" text as per user request */}
                                         <SourceDataTab
                                             campaignId={selectedCampaign ? selectedCampaign.id : "temp"}
                                             isWizard={true}
@@ -457,10 +454,6 @@ const Campaigns = () => {
                                 {/* Step 5: Script */}
                                 {currentStep === 5 && (
                                     <>
-                                        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
-                                            <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Job Context & Script</h2>
-                                            <p style={{ color: 'var(--text-secondary)' }}>Provide the Job Description so the AI knows what to look for.</p>
-                                        </div>
                                         <ScriptTab
                                             isWizard={true}
                                             setData={(data) => setWizardData({ ...wizardData, ...data })}
@@ -546,8 +539,18 @@ const Campaigns = () => {
                                         try {
                                             const updatedConfig = { ...selectedCampaign.config, source: newCandidates };
                                             await axios.put(`/api/campaigns/${selectedCampaign.id}`, { config: updatedConfig });
+
+                                            // Update Selected Campaign
                                             setSelectedCampaign(prev => ({ ...prev, config: updatedConfig }));
-                                            showToast("Candidate list updated successfully", "success");
+
+                                            // VITAL FIX: Update the main list so switching back/forth preserves data
+                                            setCampaigns(prev => prev.map(c =>
+                                                c.id === selectedCampaign.id
+                                                    ? { ...c, config: updatedConfig }
+                                                    : c
+                                            ));
+
+                                            showToast("Candidate list updated & saved", "success");
                                         } catch (error) {
                                             console.error("Error saving candidates:", error);
                                             showToast("Failed to save candidates", "error");
@@ -1041,57 +1044,99 @@ const AgentSelector = ({ isWizard, setData, initialData }) => {
 };
 
 // --- 4. Script Tab ---
+// --- 4. Script Tab ---
 const ScriptTab = ({ isWizard, setData, data }) => {
+    // Helper to bubble up changes
     const update = (key, val) => {
-        if (isWizard && setData) setData({ [key]: val });
+        // If we have a setData prop (wizard mode or parent handling state), use it.
+        // We merge with existing data to avoid overwriting other fields.
+        if (setData) {
+            setData({ ...data, [key]: val });
+        }
     };
 
     return (
-        <div>
-            <div className="script-banner">
-                <i className="fa-solid fa-link" style={{ color: '#3b82f6' }}></i>
+        <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
+
+            {/* Professional Card Layout for Inputs */}
+            <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
+                <div className="section-head" style={{ marginTop: 0 }}><i className="fa-solid fa-building-user" style={{ marginRight: '8px', color: 'var(--primary-500)' }}></i> Role Configuration</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>COMPANY NAME</label>
+                        <input
+                            type="text"
+                            className="input-dark"
+                            placeholder="e.g. Acme Corp"
+                            value={data?.company || ''}
+                            onChange={(e) => update('company', e.target.value)}
+                            style={{ background: 'var(--bg-main)' }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>INDUSTRY / DOMAIN</label>
+                        <input
+                            type="text"
+                            className="input-dark"
+                            placeholder="e.g. Fintech, Healthcare"
+                            value={data?.industry || ''}
+                            onChange={(e) => update('industry', e.target.value)}
+                            style={{ background: 'var(--bg-main)' }}
+                        />
+                    </div>
+                </div>
+
                 <div>
-                    <div style={{ fontSize: '11px', color: 'var(--primary-500)', fontWeight: 700, textTransform: 'uppercase' }}>Linked Configuration</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: 500 }}>Targeting: <span style={{ opacity: 0.7 }}>(Selected Domain)</span></div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>JOB TITLE</label>
+                    <input
+                        type="text"
+                        className="input-dark"
+                        placeholder="e.g. Senior React Developer"
+                        value={data?.jobTitle || ''}
+                        onChange={(e) => update('jobTitle', e.target.value)}
+                        style={{ background: 'var(--bg-main)' }}
+                    />
                 </div>
             </div>
 
-            <div className="section-head"><i className="fa-solid fa-building"></i> Company Identity</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                <input
-                    type="text"
+            {/* Script / Context Area */}
+            <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
+                <div className="section-head" style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between' }}>
+                    <span><i className="fa-solid fa-file-lines" style={{ marginRight: '8px', color: 'var(--primary-500)' }}></i> Job Description & Context</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400 }}>AI uses this to generate questions</span>
+                </div>
+                <textarea
                     className="input-dark"
-                    placeholder="Company Name (e.g. TechFlow)"
-                    value={data?.company || ''}
-                    onChange={(e) => update('company', e.target.value)}
-                />
-                <input
-                    type="text"
-                    className="input-dark"
-                    placeholder="Industry (e.g. Fintech)"
-                    value={data?.industry || ''}
-                    onChange={(e) => update('industry', e.target.value)}
-                />
+                    style={{ minHeight: '160px', resize: 'vertical', background: 'var(--bg-main)', fontFamily: 'monospace', fontSize: '13px', lineHeight: '1.5' }}
+                    placeholder="Paste the full Job Description, required skills, and any specific disqualification criteria here..."
+                    value={data?.script || ''}
+                    onChange={(e) => update('script', e.target.value)}
+                ></textarea>
             </div>
 
-            <div className="section-head"><i className="fa-solid fa-user-tag"></i> Role Details</div>
-            <input
-                type="text"
-                className="input-dark"
-                placeholder="Job Title (e.g. Senior Backend Engineer)"
-                style={{ marginBottom: '20px' }}
-                value={data?.jobTitle || ''}
-                onChange={(e) => update('jobTitle', e.target.value)}
-            />
-
-            <div className="section-head">Evaluation Context & Requirements</div>
-            <textarea
-                className="input-dark"
-                style={{ minHeight: '120px', resize: 'vertical' }}
-                placeholder="Paste the JD or key requirements here..."
-                value={data?.script || ''}
-                onChange={(e) => update('script', e.target.value)}
-            ></textarea>
+            {/* Reference Files Upload */}
+            <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                <div className="section-head" style={{ marginTop: 0 }}><i className="fa-solid fa-paperclip" style={{ marginRight: '8px', color: 'var(--primary-500)' }}></i> Reference Documents <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: '8px' }}>(Optional)</span></div>
+                <div
+                    style={{
+                        border: '2px dashed var(--border-subtle)',
+                        borderRadius: '8px',
+                        padding: '30px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        background: 'var(--bg-main)'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary-500)'}
+                    onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-subtle)'}
+                    onClick={() => document.getElementById('ref-doc-upload').click()}
+                >
+                    <input type="file" id="ref-doc-upload" style={{ display: 'none' }} multiple accept=".pdf,.doc,.docx,.txt" />
+                    <i className="fa-solid fa-file-pdf" style={{ fontSize: '24px', color: 'var(--text-tertiary)', marginBottom: '12px' }}></i>
+                    <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 500 }}>Upload hiring guidelines or additional context</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Supports PDF, DOCX (Max 10MB)</div>
+                </div>
+            </div>
         </div>
     );
 };
