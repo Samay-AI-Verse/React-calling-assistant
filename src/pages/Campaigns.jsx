@@ -18,7 +18,10 @@ const Campaigns = () => {
         voice: 'raju',
         lang: 'en-us',
         strict: 'balanced',
-        script: ''
+        script: '',
+        company: '',
+        industry: '',
+        jobTitle: ''
     });
 
     // Launch Modal State
@@ -80,7 +83,7 @@ const Campaigns = () => {
         setSelectedCampaign(null);
         setCurrentStep(1);
         setWizardData({
-            name: '', source: [], mode: 'technical', agent: 'aanya', voice: 'raju', lang: 'en-us', strict: 'balanced', script: ''
+            name: '', source: [], mode: 'technical', agent: 'aanya', voice: 'raju', lang: 'en-us', strict: 'balanced', script: '', company: '', industry: '', jobTitle: ''
         });
     };
 
@@ -151,7 +154,12 @@ const Campaigns = () => {
         if (currentStep === 2) return wizardData.source && wizardData.source.length > 0; // At least 1 candidate
         if (currentStep === 3) return !!wizardData.mode; // Mode required (default is set, so usually true)
         if (currentStep === 4) return !!wizardData.agent && !!wizardData.voice; // Agent & Voice required
-        if (currentStep === 5) return !!wizardData.script.trim(); // Script/JD required
+        if (currentStep === 5) {
+            const s = wizardData.script || '';
+            const c = wizardData.company || '';
+            const j = wizardData.jobTitle || '';
+            return !!s.trim() && !!c.trim() && !!j.trim();
+        }
         return true;
     };
 
@@ -453,8 +461,8 @@ const Campaigns = () => {
                                         </div>
                                         <ScriptTab
                                             isWizard={true}
-                                            setData={(script) => setWizardData({ ...wizardData, script })}
-                                            currentScript={wizardData.script}
+                                            setData={(data) => setWizardData({ ...wizardData, ...data })}
+                                            data={wizardData}
                                         />
                                     </>
                                 )}
@@ -463,9 +471,9 @@ const Campaigns = () => {
 
                         {/* 4. Footer Actions */}
                         <div className="wizard-footer">
-                            <button className="btn-back" onClick={handleWizardBack}>
-                                {currentStep === 1 ? 'Cancel' : 'Back'}
-                            </button>
+                            {(currentStep !== 1 && currentStep !== 2) ? (
+                                <button className="btn-back" onClick={handleWizardBack}>Back</button>
+                            ) : <div></div>}
 
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 {currentStep < 5 ? (
@@ -912,7 +920,11 @@ const AgentSelector = ({ isWizard, setData, initialData }) => {
 };
 
 // --- 4. Script Tab ---
-const ScriptTab = ({ isWizard, setData, currentScript }) => {
+const ScriptTab = ({ isWizard, setData, data }) => {
+    const update = (key, val) => {
+        if (isWizard && setData) setData({ [key]: val });
+    };
+
     return (
         <div>
             <div className="script-banner">
@@ -925,23 +937,40 @@ const ScriptTab = ({ isWizard, setData, currentScript }) => {
 
             <div className="section-head"><i className="fa-solid fa-building"></i> Company Identity</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                <input type="text" className="input-dark" placeholder="Company Name (e.g. TechFlow)" />
-                <input type="text" className="input-dark" placeholder="Industry (e.g. Fintech)" />
+                <input
+                    type="text"
+                    className="input-dark"
+                    placeholder="Company Name (e.g. TechFlow)"
+                    value={data?.company || ''}
+                    onChange={(e) => update('company', e.target.value)}
+                />
+                <input
+                    type="text"
+                    className="input-dark"
+                    placeholder="Industry (e.g. Fintech)"
+                    value={data?.industry || ''}
+                    onChange={(e) => update('industry', e.target.value)}
+                />
             </div>
 
             <div className="section-head"><i className="fa-solid fa-user-tag"></i> Role Details</div>
-            <input type="text" className="input-dark" placeholder="Job Title (e.g. Senior Backend Engineer)" style={{ marginBottom: '20px' }} />
+            <input
+                type="text"
+                className="input-dark"
+                placeholder="Job Title (e.g. Senior Backend Engineer)"
+                style={{ marginBottom: '20px' }}
+                value={data?.jobTitle || ''}
+                onChange={(e) => update('jobTitle', e.target.value)}
+            />
 
             <div className="section-head">Evaluation Context & Requirements</div>
             <textarea
                 className="input-dark"
                 style={{ minHeight: '120px', resize: 'vertical' }}
                 placeholder="Paste the JD or key requirements here..."
-                value={currentScript || ''}
-                onChange={(e) => isWizard && setData && setData(e.target.value)}
+                value={data?.script || ''}
+                onChange={(e) => update('script', e.target.value)}
             ></textarea>
-
-
         </div>
     );
 };
