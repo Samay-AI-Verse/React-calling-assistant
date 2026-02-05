@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Campaigns.css'; // Import the new styles
+import { read, utils } from 'xlsx';
 
 const Campaigns = () => {
     const [campaigns, setCampaigns] = useState([]);
@@ -666,6 +667,41 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
 
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = read(data);
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rawData = utils.sheet_to_json(worksheet);
+
+            const mappedData = rawData.map(row => {
+                const keys = Object.keys(row);
+                // Simple heuristic to find fields case-insensitively
+                const nameKey = keys.find(k => /name/i.test(k));
+                const phoneKey = keys.find(k => /(phone|mobile|cell|contact)/i.test(k));
+                const emailKey = keys.find(k => /email/i.test(k));
+
+                return {
+                    name: nameKey ? row[nameKey] : '',
+                    phone: phoneKey ? row[phoneKey] : '',
+                    email: emailKey ? row[emailKey] : ''
+                };
+            }).filter(item => item.name || item.phone || item.email);
+
+            if (mappedData.length > 0) {
+                const newList = [...candidates, ...mappedData];
+                setCandidates(newList);
+                if (isWizard && setData) setData(newList);
+            }
+        } catch (error) {
+            console.error("Error parsing file:", error);
+            alert("Failed to parse file. Please share a valid CSV or Excel file.");
+        }
+    };
+
     const handleAdd = () => {
         if (name && phone) {
             const newList = [...candidates, { name, phone, email }];
@@ -677,17 +713,32 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData }) => {
 
     return (
         <div>
+            <input
+                type="file"
+                id={`file-upload-${campaignId || 'wizard'}`}
+                style={{ display: 'none' }}
+                accept=".csv, .xlsx, .xls"
+                onChange={handleFileUpload}
+            />
+
             {!isWizard && (
-                <div className="upload-zone">
+                <div
+                    className="upload-zone"
+                    onClick={() => document.getElementById(`file-upload-${campaignId || 'wizard'}`).click()}
+                >
                     <i className="fa-solid fa-cloud-arrow-up upload-icon"></i>
                     <h3 style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '8px' }}>Bulk Import Candidates</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Drag & drop CSV or Excel files here</p>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Click or Drag & drop CSV or Excel files here</p>
                 </div>
             )}
 
             {isWizard && (
-                <div style={{ marginBottom: '24px', padding: '20px', border: '2px dashed var(--border-subtle)', borderRadius: '8px', textAlign: 'center' }}>
-                    Click to upload CSV (Mock)
+                <div
+                    style={{ marginBottom: '24px', padding: '20px', border: '2px dashed var(--border-subtle)', borderRadius: '8px', textAlign: 'center', cursor: 'pointer' }}
+                    onClick={() => document.getElementById(`file-upload-${campaignId || 'wizard'}`).click()}
+                >
+                    <i className="fa-solid fa-cloud-arrow-up" style={{ marginRight: '8px', color: 'var(--primary-500)' }}></i>
+                    Click to upload CSV/Excel
                 </div>
             )}
 
