@@ -116,7 +116,9 @@ const Campaigns = () => {
                 vapi_voice_id: wizardData.voice || 'raju',  // Pass the selected voice key
                 system_prompt: blueprintData?.system_prompt || wizardData.script,
                 strictness: wizardData.strict,
-                interview_mode: wizardData.mode
+                interview_mode: wizardData.mode,
+                evaluation_focus: wizardData.evaluationFocus || [], // Selected evaluation areas
+                professional_domain: wizardData.domain || null // Selected professional domain
             });
 
             await fetchCampaigns();
@@ -253,13 +255,15 @@ const Campaigns = () => {
             try {
                 // 2. Call API to generate blueprint
                 const res = await axios.post('/api/generate-blueprint', {
-                    company_name: 'TechCompany', // You could add this to wizard if needed
-                    job_role: wizardData.name,
+                    company_name: wizardData.company || 'TechCompany',
+                    job_role: wizardData.jobTitle || wizardData.name,
                     description: wizardData.script,
                     candidate_count: wizardData.source.length,
                     agent_persona: wizardData.agent,
                     strictness: wizardData.strict,
                     interview_mode: wizardData.mode,
+                    evaluation_focus: wizardData.evaluationFocus || [], // Selected evaluation areas
+                    professional_domain: wizardData.domain || null, // Selected professional domain
                     duration: 15
                 });
 
@@ -430,8 +434,8 @@ const Campaigns = () => {
                                         </div>
                                         <InterviewStepsTab
                                             isWizard={true}
-                                            setData={(mode) => setWizardData({ ...wizardData, mode })}
-                                            initialMode={wizardData.mode}
+                                            setData={(data) => setWizardData({ ...wizardData, ...data })}
+                                            initialData={wizardData}
                                         />
                                     </>
                                 )}
@@ -565,7 +569,7 @@ const Campaigns = () => {
                                 <div className="tab-content-wrapper">
                                     <div className="section-head">Interview Configuration</div>
                                     <div style={{ background: 'var(--bg-card)', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '32px' }}>
-                                        <InterviewStepsTab />
+                                        <InterviewStepsTab initialData={selectedCampaign?.config || {}} />
                                     </div>
 
                                     <div className="section-head">AI Persona Settings</div>
@@ -777,26 +781,15 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData, onSave, sho
                 onChange={handleFileUpload}
             />
 
-            {!isWizard && (
-                <div
-                    className="upload-zone"
-                    onClick={() => document.getElementById(`file-upload-${campaignId || 'wizard'}`).click()}
-                >
-                    <i className="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                    <h3 style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '8px' }}>Bulk Import Candidates</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Click or Drag & drop CSV or Excel files here</p>
-                </div>
-            )}
-
-            {isWizard && (
-                <div
-                    style={{ marginBottom: '24px', padding: '20px', border: '2px dashed var(--border-subtle)', borderRadius: '8px', textAlign: 'center', cursor: 'pointer' }}
-                    onClick={() => document.getElementById(`file-upload-${campaignId || 'wizard'}`).click()}
-                >
-                    <i className="fa-solid fa-cloud-arrow-up" style={{ marginRight: '8px', color: 'var(--primary-500)' }}></i>
-                    Click to upload CSV/Excel
-                </div>
-            )}
+            {/* Unified Large Upload Zone for both Wizard and Edit modes */}
+            <div
+                className="upload-zone"
+                onClick={() => document.getElementById(`file-upload-${campaignId || 'wizard'}`).click()}
+            >
+                <i className="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                <h3 style={{ fontSize: '15px', color: 'var(--text-main)', marginBottom: '8px' }}>Bulk Import Candidates</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>Click or Drag & drop CSV or Excel files here</p>
+            </div>
 
             <div className="section-head" style={{ marginTop: '30px', marginBottom: '16px' }}>
                 ADD CANDIDATE
@@ -857,17 +850,65 @@ const SourceDataTab = ({ campaignId, isWizard, setData, initialData, onSave, sho
 const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
     const [mode, setMode] = useState(initialData?.mode || 'technical');
     const [duration, setDuration] = useState(initialData?.duration || '15 Mins');
+    const [selectedEvaluationFocus, setSelectedEvaluationFocus] = useState([]);
+    const [selectedDomain, setSelectedDomain] = useState(null);
 
     const update = (key, val) => {
         if (key === 'mode') {
             setMode(val);
-            if (isWizard && setData) setData({ mode: val, duration });
+            // Reset selections when mode changes
+            setSelectedEvaluationFocus([]);
+            setSelectedDomain(null);
+            if (isWizard && setData) setData({ mode: val, duration, evaluationFocus: [], domain: null });
         }
         if (key === 'duration') {
             setDuration(val);
-            if (isWizard && setData) setData({ mode, duration: val });
+            if (isWizard && setData) setData({ mode, duration: val, evaluationFocus: selectedEvaluationFocus, domain: selectedDomain });
         }
     };
+
+    const toggleEvaluationFocus = (focus) => {
+        const newFocus = selectedEvaluationFocus.includes(focus)
+            ? selectedEvaluationFocus.filter(f => f !== focus)
+            : [...selectedEvaluationFocus, focus];
+        setSelectedEvaluationFocus(newFocus);
+        if (isWizard && setData) setData({ mode, duration, evaluationFocus: newFocus, domain: selectedDomain });
+    };
+
+    const selectDomain = (domain) => {
+        setSelectedDomain(domain);
+        if (isWizard && setData) setData({ mode, duration, evaluationFocus: selectedEvaluationFocus, domain });
+    };
+
+    const evaluationFocusOptions = {
+        technical: [
+            { id: 'cultural-fit', label: 'Cultural Fit', desc: 'Values, Teamwork, Adaptability', icon: 'fa-handshake' },
+            { id: 'behavioral', label: 'Behavioral (STAR)', desc: 'Problem Solving, Conflict Resolution', icon: 'fa-comments' },
+            { id: 'leadership', label: 'Leadership Potential', desc: 'Ownership, Mentoring, Vision', icon: 'fa-users-gear' },
+            { id: 'career-stability', label: 'Career Stability', desc: 'Job History, Gaps, Motivation', icon: 'fa-chart-line' }
+        ],
+        hr: [
+            { id: 'cultural-fit', label: 'Cultural Fit', desc: 'Values, Teamwork, Adaptability', icon: 'fa-handshake' },
+            { id: 'behavioral', label: 'Behavioral (STAR)', desc: 'Problem Solving, Conflict Resolution', icon: 'fa-comments' },
+            { id: 'leadership', label: 'Leadership Potential', desc: 'Ownership, Mentoring, Vision', icon: 'fa-users-gear' },
+            { id: 'career-stability', label: 'Career Stability', desc: 'Job History, Gaps, Motivation', icon: 'fa-chart-line' }
+        ]
+    };
+
+    const professionalDomains = [
+        { id: 'frontend', label: 'Frontend Dev', icon: 'fa-atom', color: '#3b82f6' },
+        { id: 'backend', label: 'Backend Dev', icon: 'fa-server', color: '#10b981' },
+        { id: 'fullstack', label: 'Full Stack', icon: 'fa-layer-group', color: '#a855f7' },
+        { id: 'mobile', label: 'Mobile App', icon: 'fa-mobile-screen', color: '#06b6d4' },
+        { id: 'ai', label: 'Generative AI', icon: 'fa-wand-magic-sparkles', color: '#8b5cf6' },
+        { id: 'ml', label: 'AI / ML Engineer', icon: 'fa-brain', color: '#ef4444' },
+        { id: 'data-engineer', label: 'Data Engineer', icon: 'fa-database', color: '#f59e0b' },
+        { id: 'data-analyst', label: 'Data Analyst', icon: 'fa-chart-simple', color: '#14b8a6' },
+        { id: 'devops', label: 'DevOps / Cloud', icon: 'fa-infinity', color: '#f97316' },
+        { id: 'product', label: 'Product Mgmt', icon: 'fa-list-check', color: '#6366f1' },
+        { id: 'uiux', label: 'UI/UX Design', icon: 'fa-palette', color: '#ec4899' },
+        { id: 'qa', label: 'QA / SDET', icon: 'fa-check-double', color: '#84cc16' }
+    ];
 
     return (
         <div>
@@ -885,15 +926,122 @@ const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
                     <div style={{ fontWeight: 600, marginBottom: '6px' }}>HR Round</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Culture & Soft Skills</div>
                 </div>
-                {/* Mixed */}
-                <div className={`step-card ${mode === 'mixed' ? 'active' : ''}`} onClick={() => update('mode', 'mixed')}>
-                    <div className="step-orb" style={{ background: 'conic-gradient(from 180deg, cyan, #0e7490)' }}></div>
-                    <div style={{ fontWeight: 600, marginBottom: '6px' }}>Mixed</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>50% Tech + 50% HR</div>
-                </div>
             </div>
 
-            <div className="section-head">2. DURATION</div>
+            {/* Technical Mode - Show Professional Domain and Evaluation Focus */}
+            {mode === 'technical' && (
+                <>
+                    <div className="section-head" style={{ marginTop: '32px' }}>SELECT PROFESSIONAL DOMAIN</div>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                        gap: '12px',
+                        marginBottom: '24px'
+                    }}>
+                        {professionalDomains.map(domain => (
+                            <div
+                                key={domain.id}
+                                onClick={() => selectDomain(domain.id)}
+                                style={{
+                                    background: selectedDomain === domain.id ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-card)',
+                                    border: selectedDomain === domain.id ? '2px solid #3b82f6' : '1px solid var(--border-subtle)',
+                                    borderRadius: '8px',
+                                    padding: '12px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    textAlign: 'center'
+                                }}
+                            >
+                                <i className={`fa-solid ${domain.icon}`} style={{ fontSize: '24px', color: domain.color, marginBottom: '8px' }}></i>
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)' }}>{domain.label}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="section-head">SELECT EVALUATION FOCUS</div>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                        gap: '12px'
+                    }}>
+                        {evaluationFocusOptions.technical.map(focus => (
+                            <div
+                                key={focus.id}
+                                onClick={() => toggleEvaluationFocus(focus.id)}
+                                style={{
+                                    background: selectedEvaluationFocus.includes(focus.id) ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-card)',
+                                    border: selectedEvaluationFocus.includes(focus.id) ? '2px solid #3b82f6' : '1px solid var(--border-subtle)',
+                                    borderRadius: '8px',
+                                    padding: '14px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    position: 'relative'
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                    <i className={`fa-solid ${focus.icon}`} style={{ fontSize: '20px', color: 'var(--primary-500)' }}></i>
+                                    <div style={{ fontWeight: 600, fontSize: '14px' }}>{focus.label}</div>
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{focus.desc}</div>
+                                {selectedEvaluationFocus.includes(focus.id) && (
+                                    <i className="fa-solid fa-circle-check" style={{
+                                        position: 'absolute',
+                                        top: '10px',
+                                        right: '10px',
+                                        color: '#3b82f6',
+                                        fontSize: '16px'
+                                    }}></i>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* HR Mode - Show Evaluation Focus */}
+            {mode === 'hr' && (
+                <>
+                    <div className="section-head" style={{ marginTop: '32px' }}>SELECT EVALUATION FOCUS</div>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                        gap: '12px'
+                    }}>
+                        {evaluationFocusOptions.hr.map(focus => (
+                            <div
+                                key={focus.id}
+                                onClick={() => toggleEvaluationFocus(focus.id)}
+                                style={{
+                                    background: selectedEvaluationFocus.includes(focus.id) ? 'rgba(234, 179, 8, 0.1)' : 'var(--bg-card)',
+                                    border: selectedEvaluationFocus.includes(focus.id) ? '2px solid #eab308' : '1px solid var(--border-subtle)',
+                                    borderRadius: '8px',
+                                    padding: '14px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    position: 'relative'
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                    <i className={`fa-solid ${focus.icon}`} style={{ fontSize: '20px', color: '#eab308' }}></i>
+                                    <div style={{ fontWeight: 600, fontSize: '14px' }}>{focus.label}</div>
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{focus.desc}</div>
+                                {selectedEvaluationFocus.includes(focus.id) && (
+                                    <i className="fa-solid fa-circle-check" style={{
+                                        position: 'absolute',
+                                        top: '10px',
+                                        right: '10px',
+                                        color: '#eab308',
+                                        fontSize: '16px'
+                                    }}></i>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            <div className="section-head" style={{ marginTop: '32px' }}>2. DURATION</div>
             <div style={{ display: 'flex', gap: '12px' }}>
                 {['15 Mins', '20 Mins', '30 Mins', '45 Mins'].map(t => (
                     <button
