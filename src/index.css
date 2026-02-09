@@ -2,65 +2,73 @@
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
 :root {
-    /* --- Theme: Light Mode (Foundation) --- */
+    /* --- Premium White UI System --- */
 
-    /* Primary Brand Color (The Blue) */
-    --primary-50: #EDF5FD;
-    --primary-100: #D0E4F9;
-    --primary-400: #5D9CEC;
-    --primary-500: #2B78C5;
+    /* Primary Brand Color (Blue Accent) */
+    --primary-50: #EFF6FF;
+    --primary-100: #DBEAFE;
+    --primary-400: #60A5FA;
+    --primary-500: #2563EB;
     /* Action Blue */
-    --primary-600: #205D9E;
+    --primary-600: #1D4ED8;
     /* Darker for hover */
 
-    /* Neutrals / Grays */
+    /* Neutrals / Grays - Premium White System */
     --white: #FFFFFF;
-    --gray-50: #F8F9FA;
-    /* Background White */
-    --gray-100: #F1F3F5;
-    --gray-200: #E9ECEF;
-    /* Soft Gray */
-    --gray-300: #DEE2E6;
-    /* Soft Gray */
-    --gray-400: #CED4DA;
-    --gray-500: #ADB5BD;
-    --gray-600: #6C757D;
-    /* Text Secondary */
-    --gray-700: #495057;
-    --gray-800: #343A40;
-    --gray-900: #212529;
-    /* Text Primary */
+    --gray-50: #F6F8FC;
+    /* Off-white app background */
+    --gray-100: #F1F5F9;
+    /* Subtle neutral background */
+    --gray-200: #E2E8F0;
+    /* Very soft gray */
+    --gray-300: #CBD5E1;
+    /* Soft gray */
+    --gray-400: #94A3B8;
+    --gray-500: #64748B;
+    /* Muted/secondary text */
+    --gray-600: #475569;
+    --gray-700: #334155;
+    /* Body text */
+    --gray-800: #1E293B;
+    --gray-900: #0F172A;
+    /* Headings */
 
     /* Functional Accents */
-    --success: #27AE60;
-    /* Success Green - Start Campaign */
-    --success-bg: rgba(39, 174, 96, 0.15);
-    --success-text: #27AE60;
+    --success: #10B981;
+    /* Success Green */
+    --success-bg: rgba(16, 185, 129, 0.1);
+    --success-text: #059669;
 
-    --warning: #F1C40F;
-    --warning-bg: rgba(241, 196, 15, 0.15);
-    --warning-text: #D4AC0D;
+    --warning: #F59E0B;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --warning-text: #D97706;
 
-    --danger: #E74C3C;
-    --danger-bg: rgba(231, 76, 60, 0.15);
-    --danger-text: #C0392B;
+    --danger: #EF4444;
+    --danger-bg: rgba(239, 68, 68, 0.1);
+    --danger-text: #DC2626;
 
     /* Backgrounds */
-    --bg-body: #F8F9FA;
+    --bg-body: #F1F5F9;
+    /* Darker off-white for better card contrast */
     --bg-card: #FFFFFF;
+    /* Pure white for cards */
     --bg-sidebar: #FFFFFF;
     --bg-input: #FFFFFF;
-    --bg-hover: #F1F3F5;
+    --bg-hover: #E2E8F0;
+    /* Slightly darker hover state */
 
-    /* Borders */
-    --border-subtle: #27272a;
-    /* Darker border */
-    --border-focus: #2B78C5;
+    /* Borders - Subtle and low contrast */
+    --border-subtle: rgba(15, 23, 42, 0.08);
+    /* Almost invisible */
+    --border-focus: #2563EB;
 
-    /* Text */
-    --text-main: #000000;
-    --text-secondary: #1a1a1a;
-    --text-tertiary: #404040;
+    /* Text - No pure black */
+    --text-main: #0F172A;
+    /* Headings */
+    --text-secondary: #334155;
+    /* Body text */
+    --text-tertiary: #64748B;
+    /* Muted text */
 
     /* --- Spacing --- */
     --space-1: 4px;
@@ -74,12 +82,13 @@
     /* LOGO ANIMATION VARS */
     --logo-anim-duration: 3s;
 
-    /* --- Shadows (Depth, not Glow) --- */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    /* --- Shadows - Soft and Realistic --- */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+    --shadow-active: 0 0 0 2px rgba(37, 99, 235, 0.15), 0 8px 20px rgba(37, 99, 235, 0.12);
 
     /* --- Radius --- */
-    --radius-sm: 4px;
+    --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
     --radius-xl: 16px;
@@ -90,11 +99,11 @@
     --duration-fast: 200ms;
     --duration-normal: 300ms;
 
-    /* VAPI VARS - Mapped to Light Theme */
+    /* VAPI VARS - Mapped to Premium White Theme */
     --vapi-bg-dark: #FFFFFF;
-    --vapi-bg-panel: #F8F9FA;
-    --vapi-border: #DEE2E6;
-    --vapi-primary: #2B78C5;
+    --vapi-bg-panel: #F1F5F9;
+    --vapi-border: rgba(15, 23, 42, 0.08);
+    --vapi-primary: #2563EB;
     --vapi-orange: #f97316;
     --vapi-yellow: #eab308;
     --vapi-blue: #3b82f6;
@@ -597,7 +606,7 @@ a {
     background: var(--bg-hover);
 }
 
-/* Cards (Matte, No Glow) */
+/* Cards (Premium White UI) */
 .card {
     background: var(--bg-card);
     border-radius: var(--radius-lg);
@@ -624,6 +633,7 @@ a {
     flex-direction: column;
     position: relative;
     overflow: hidden;
+    box-shadow: var(--shadow-card);
 }
 
 .kpi-header {
@@ -637,13 +647,13 @@ a {
     width: 32px;
     height: 32px;
     border-radius: var(--radius-md);
-    background: var(--bg-hover);
+    background: var(--gray-100);
     color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 14px;
-    border: 1px solid var(--border-subtle);
+    border: none;
 }
 
 .kpi-label {

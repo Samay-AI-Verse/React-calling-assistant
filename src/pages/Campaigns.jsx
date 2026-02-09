@@ -16,7 +16,7 @@ const Campaigns = () => {
         source: [], // candidates
         mode: 'technical', // interview steps
         agent: 'aanya',
-        voice: 'raju',
+        voice: 'alloy-openai',
         lang: 'en-us',
         strict: 'balanced',
         script: '',
@@ -84,7 +84,7 @@ const Campaigns = () => {
         setSelectedCampaign(null);
         setCurrentStep(1);
         setWizardData({
-            name: '', source: [], mode: 'technical', agent: 'aanya', voice: 'raju', lang: 'en-us', strict: 'balanced', script: '', company: '', industry: '', jobTitle: ''
+            name: '', source: [], mode: 'technical', agent: 'aanya', voice: 'alloy-openai', lang: 'en-us', strict: 'balanced', script: '', company: '', industry: '', jobTitle: ''
         });
     };
 
@@ -109,16 +109,33 @@ const Campaigns = () => {
         if (!selectedCampaign) return;
 
         try {
-            // USER REQUEST: Call the actual launch endpoint to trigger Vapi calls
+            // 1. Determine Identity & Config
+            const campaignId = selectedCampaign.id || selectedCampaign._id;
+            // Prefer wizardData if we are currently creating (wizard mode) to ensure latest inputs
+            const cfg = isCreating ? wizardData : (selectedCampaign.config || wizardData);
+
+            // 2. Sync Candidates to DB (Crucial for Vapi & Reports)
+            if (cfg.source && cfg.source.length > 0) {
+                try {
+                    await axios.post('/api/candidates/save', {
+                        campaign_id: campaignId,
+                        candidates: cfg.source
+                    });
+                } catch (e) {
+                    console.error("Candidate sync warning:", e);
+                }
+            }
+
+            // 3. Launch Campaign (Start Calls)
             await axios.post('/api/launch-campaign', {
-                campaign_id: selectedCampaign.id,
-                vapi_agent_id: wizardData.agent || 'aanya', // Pass the selected agent key
-                vapi_voice_id: wizardData.voice || 'raju',  // Pass the selected voice key
-                system_prompt: blueprintData?.system_prompt || wizardData.script,
-                strictness: wizardData.strict,
-                interview_mode: wizardData.mode,
-                evaluation_focus: wizardData.evaluationFocus || [], // Selected evaluation areas
-                professional_domain: wizardData.domain || null // Selected professional domain
+                campaign_id: campaignId,
+                vapi_agent_id: cfg.agent || 'aanya',
+                vapi_voice_id: cfg.voice || 'raju',
+                system_prompt: blueprintData?.system_prompt || cfg.script,
+                strictness: cfg.strict,
+                interview_mode: cfg.mode,
+                evaluation_focus: cfg.evaluationFocus || [],
+                professional_domains: cfg.domains || []
             });
 
             await fetchCampaigns();
@@ -148,6 +165,24 @@ const Campaigns = () => {
             } catch (e) {
                 showToast("Failed to update campaign status", "error");
             }
+        }
+    };
+
+    const handleStopCampaign = async () => {
+        if (!selectedCampaign) return;
+        try {
+            await axios.post('/api/stop-campaign', { campaign_id: selectedCampaign.id });
+            setSelectedCampaign(prev => ({ ...prev, status: 'Stopped' }));
+
+            // Update list
+            setCampaigns(prev => prev.map(c =>
+                c.id === selectedCampaign.id ? { ...c, status: 'Stopped' } : c
+            ));
+
+            showToast("Campaign Stopped", "info");
+        } catch (error) {
+            console.error("Error stopping campaign:", error);
+            showToast("Failed to stop campaign", "error");
         }
     };
 
@@ -263,7 +298,7 @@ const Campaigns = () => {
                     strictness: wizardData.strict,
                     interview_mode: wizardData.mode,
                     evaluation_focus: wizardData.evaluationFocus || [], // Selected evaluation areas
-                    professional_domain: wizardData.domain || null, // Selected professional domain
+                    professional_domains: wizardData.domains || [], // Selected professional domains (array)
                     duration: 15
                 });
 
@@ -504,14 +539,14 @@ const Campaigns = () => {
                         <header className="vapi-header">
                             <div className="header-left" style={{ display: 'flex', alignItems: 'center' }}>
                                 <h2>{selectedCampaign.name}</h2>
-                                <span className={`status-badge ${selectedCampaign.status === 'Active' ? 'active-status' : ''}`}>● {selectedCampaign.status}</span>
+                                <span className={`status-badge ${['Active', 'Running'].includes(selectedCampaign.status) ? 'active-status' : ''}`}>● {selectedCampaign.status}</span>
                             </div>
-                            {selectedCampaign.status === 'Active' ? (
-                                <button className="btn-start stop-mode">
+                            {['Active', 'Running'].includes(selectedCampaign.status) ? (
+                                <button className="btn-start stop-mode" onClick={handleStopCampaign} style={{ background: 'var(--danger)', color: 'white' }}>
                                     <i className="fa-solid fa-stop"></i> Stop Campaign
                                 </button>
                             ) : (
-                                <button className="btn-start">
+                                <button className="btn-start" onClick={() => setShowLaunchModal(true)}>
                                     <i className="fa-solid fa-rocket"></i> Start Campaign
                                 </button>
                             )}
@@ -563,7 +598,7 @@ const Campaigns = () => {
                                     showToast={showToast}
                                 />
                             )}
-                            {activeTab === 'reports' && <ReportsTab />}
+                            {activeTab === 'reports' && <ReportsTab campaignId={selectedCampaign.id} />}
                             {activeTab === 'cost' && <CostTab />}
                             {activeTab === 'settings' && (
                                 <div className="tab-content-wrapper">
@@ -851,19 +886,19 @@ const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
     const [mode, setMode] = useState(initialData?.mode || 'technical');
     const [duration, setDuration] = useState(initialData?.duration || '15 Mins');
     const [selectedEvaluationFocus, setSelectedEvaluationFocus] = useState([]);
-    const [selectedDomain, setSelectedDomain] = useState(null);
+    const [selectedDomains, setSelectedDomains] = useState([]);
 
     const update = (key, val) => {
         if (key === 'mode') {
             setMode(val);
             // Reset selections when mode changes
             setSelectedEvaluationFocus([]);
-            setSelectedDomain(null);
-            if (isWizard && setData) setData({ mode: val, duration, evaluationFocus: [], domain: null });
+            setSelectedDomains([]);
+            if (isWizard && setData) setData({ mode: val, duration, evaluationFocus: [], domains: [] });
         }
         if (key === 'duration') {
             setDuration(val);
-            if (isWizard && setData) setData({ mode, duration: val, evaluationFocus: selectedEvaluationFocus, domain: selectedDomain });
+            if (isWizard && setData) setData({ mode, duration: val, evaluationFocus: selectedEvaluationFocus, domains: selectedDomains });
         }
     };
 
@@ -872,12 +907,15 @@ const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
             ? selectedEvaluationFocus.filter(f => f !== focus)
             : [...selectedEvaluationFocus, focus];
         setSelectedEvaluationFocus(newFocus);
-        if (isWizard && setData) setData({ mode, duration, evaluationFocus: newFocus, domain: selectedDomain });
+        if (isWizard && setData) setData({ mode, duration, evaluationFocus: newFocus, domains: selectedDomains });
     };
 
-    const selectDomain = (domain) => {
-        setSelectedDomain(domain);
-        if (isWizard && setData) setData({ mode, duration, evaluationFocus: selectedEvaluationFocus, domain });
+    const toggleDomain = (domain) => {
+        const newDomains = selectedDomains.includes(domain)
+            ? selectedDomains.filter(d => d !== domain)
+            : [...selectedDomains, domain];
+        setSelectedDomains(newDomains);
+        if (isWizard && setData) setData({ mode, duration, evaluationFocus: selectedEvaluationFocus, domains: newDomains });
     };
 
     const evaluationFocusOptions = {
@@ -941,19 +979,29 @@ const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
                         {professionalDomains.map(domain => (
                             <div
                                 key={domain.id}
-                                onClick={() => selectDomain(domain.id)}
+                                onClick={() => toggleDomain(domain.id)}
                                 style={{
-                                    background: selectedDomain === domain.id ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-card)',
-                                    border: selectedDomain === domain.id ? '2px solid #3b82f6' : '1px solid var(--border-subtle)',
+                                    background: selectedDomains.includes(domain.id) ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-card)',
+                                    border: selectedDomains.includes(domain.id) ? '2px solid #3b82f6' : '1px solid var(--border-subtle)',
                                     borderRadius: '8px',
                                     padding: '12px',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
-                                    textAlign: 'center'
+                                    textAlign: 'center',
+                                    position: 'relative'
                                 }}
                             >
                                 <i className={`fa-solid ${domain.icon}`} style={{ fontSize: '24px', color: domain.color, marginBottom: '8px' }}></i>
                                 <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)' }}>{domain.label}</div>
+                                {selectedDomains.includes(domain.id) && (
+                                    <i className="fa-solid fa-circle-check" style={{
+                                        position: 'absolute',
+                                        top: '8px',
+                                        right: '8px',
+                                        color: '#3b82f6',
+                                        fontSize: '16px'
+                                    }}></i>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -1060,7 +1108,7 @@ const InterviewStepsTab = ({ isWizard, setData, initialData }) => {
 // --- 3. Agent Selector (AI Persona) ---
 const AgentSelector = ({ isWizard, setData, initialData }) => {
     const [persona, setPersona] = useState(initialData?.agent || 'aanya');
-    const [voice, setVoice] = useState(initialData?.voice || 'raju');
+    const [voice, setVoice] = useState(initialData?.voice || 'alloy-openai');
     const [lang, setLang] = useState(initialData?.lang || 'en-us');
     const [strict, setStrict] = useState(initialData?.strict || 'balanced');
 
@@ -1108,24 +1156,24 @@ const AgentSelector = ({ isWizard, setData, initialData }) => {
             {/* 2. Voice Model */}
             <div className="section-head">2. Select Voice Model</div>
             <div className="grid-voices">
-                <div className={`voice-card ${voice === 'raju' ? 'active' : ''}`} onClick={() => update('voice', 'raju')}>
+                <div className={`voice-card ${voice === 'alloy-openai' ? 'active' : ''}`} onClick={() => update('voice', 'alloy-openai')}>
                     <div className="voice-orb" style={{ background: 'conic-gradient(#ea580c, #fdba74)' }}></div>
                     <div className="voice-info">
-                        <h4>Raju <i className="fa-solid fa-circle-check" style={{ color: '#3b82f6', fontSize: '12px' }}></i></h4>
+                        <h4>Raju (Alloy) <i className="fa-solid fa-circle-check" style={{ color: '#3b82f6', fontSize: '12px' }}></i></h4>
                         <div className="voice-tag">🇮🇳 Hindi + English</div>
                     </div>
                 </div>
-                <div className={`voice-card ${voice === 'priya' ? 'active' : ''}`} onClick={() => update('voice', 'priya')}>
+                <div className={`voice-card ${voice === 'nova-openai' ? 'active' : ''}`} onClick={() => update('voice', 'nova-openai')}>
                     <div className="voice-orb" style={{ background: 'conic-gradient(#dc2626, #fca5a5)' }}></div>
                     <div className="voice-info">
-                        <h4>Priya</h4>
+                        <h4>Priya (Nova)</h4>
                         <div className="voice-tag">🇮🇳 English</div>
                     </div>
                 </div>
-                <div className={`voice-card ${voice === 'anjali' ? 'active' : ''}`} onClick={() => update('voice', 'anjali')}>
+                <div className={`voice-card ${voice === 'shimmer-openai' ? 'active' : ''}`} onClick={() => update('voice', 'shimmer-openai')}>
                     <div className="voice-orb" style={{ background: 'conic-gradient(#7c3aed, #d8b4fe)' }}></div>
                     <div className="voice-info">
-                        <h4>Anjali <i className="fa-solid fa-circle-check" style={{ color: '#3b82f6', fontSize: '12px' }}></i></h4>
+                        <h4>Anjali (Shimmer) <i className="fa-solid fa-circle-check" style={{ color: '#3b82f6', fontSize: '12px' }}></i></h4>
                         <div className="voice-tag">🇮🇳 Marathi (मराठी)</div>
                     </div>
                 </div>
@@ -1290,32 +1338,226 @@ const ScriptTab = ({ isWizard, setData, data }) => {
 };
 
 // --- 5. Reports Tab ---
-const ReportsTab = () => {
+const ReportsTab = ({ campaignId }) => {
+    const [candidates, setCandidates] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedReport, setSelectedReport] = useState(null); // Candidate object for modal
+
+    // Fetch Candidates on Mount & Poll every 5s for updates
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const res = await axios.get(`/api/campaigns/${campaignId}/candidates`);
+                if (res.data && res.data.candidates) {
+                    setCandidates(res.data.candidates);
+                }
+            } catch (error) {
+                console.error("Error fetching reports:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        const interval = setInterval(fetchData, 5000); // Polling for live status updates
+        return () => clearInterval(interval);
+    }, [campaignId]);
+
+    // Derived Stats
+    const total = candidates.length;
+    const completed = candidates.filter(c => c.status === 'Completed').length;
+    const pending = candidates.filter(c => ['Pending', 'Dialing', 'In Progress'].includes(c.status)).length;
+    const failed = candidates.filter(c => c.status === 'Failed').length;
+
+    // Helper to get score color
+    const getScoreColor = (score) => {
+        if (!score) return '#94a3b8';
+        if (score >= 8) return '#10b981';
+        if (score >= 5) return '#f59e0b';
+        return '#ef4444';
+    };
+
     return (
         <div>
+            {/* KPI Summary */}
             <div className="kpi-row">
                 <div className="kpi-box">
-                    <div className="kpi-val" style={{ color: '#10b981' }}>12</div>
-                    <div className="kpi-lbl">Shortlisted</div>
+                    <div className="kpi-val" style={{ color: 'var(--text-main)' }}>{total}</div>
+                    <div className="kpi-lbl">Total Candidates</div>
                 </div>
                 <div className="kpi-box">
-                    <div className="kpi-val" style={{ color: '#ef4444' }}>5</div>
-                    <div className="kpi-lbl">Rejected</div>
+                    <div className="kpi-val" style={{ color: '#10b981' }}>{completed}</div>
+                    <div className="kpi-lbl">Interviews Done</div>
                 </div>
                 <div className="kpi-box">
-                    <div className="kpi-val">42</div>
-                    <div className="kpi-lbl">Under Review</div>
+                    <div className="kpi-val" style={{ color: '#3b82f6' }}>{pending}</div>
+                    <div className="kpi-lbl">In Queue / Live</div>
+                </div>
+                <div className="kpi-box">
+                    <div className="kpi-val" style={{ color: '#ef4444' }}>{failed}</div>
+                    <div className="kpi-lbl">Failed / Dropped</div>
                 </div>
             </div>
 
-            <div className="section-head">RECENT INTERVIEWS</div>
-            <table className="data-table">
-                <thead><tr><th>Name</th><th>Status</th><th>Score</th><th>Date</th></tr></thead>
-                <tbody>
-                    <tr><td>Sarah Jenkins</td><td><span style={{ color: '#10b981' }}>Selected</span></td><td>9.2/10</td><td>Oct 24</td></tr>
-                    <tr><td>Michael Chen</td><td><span style={{ color: '#ef4444' }}>Rejected</span></td><td>4.5/10</td><td>Oct 23</td></tr>
-                </tbody>
-            </table>
+            {/* Candidates List */}
+            <div className="section-head" style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between' }}>
+                <span>CANDIDATE REPORTS</span>
+                {loading && <i className="fa-solid fa-spinner fa-spin" style={{ color: 'var(--primary-500)' }}></i>}
+            </div>
+
+            <div className="table-container" style={{ background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ background: 'rgba(241, 245, 249, 0.5)', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left' }}>
+                            <th style={{ padding: '16px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Name</th>
+                            <th style={{ padding: '16px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Status</th>
+                            <th style={{ padding: '16px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Duration</th>
+                            <th style={{ padding: '16px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Score</th>
+                            <th style={{ padding: '16px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {candidates.length === 0 ? (
+                            <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-tertiary)' }}>No candidates found. Add some in the "Source Data" tab.</td></tr>
+                        ) : (
+                            candidates.map(candidate => (
+                                <tr key={candidate.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                    <td style={{ padding: '16px', fontWeight: '500', color: 'var(--text-main)' }}>
+                                        {candidate.name}
+                                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{candidate.phone}</div>
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        <span className={`status-pill ${candidate.status.toLowerCase().replace(' ', '-')}`}
+                                            style={{
+                                                padding: '4px 10px',
+                                                borderRadius: '20px',
+                                                fontSize: '11px',
+                                                fontWeight: '600',
+                                                background: candidate.status === 'Completed' ? 'rgba(16, 185, 129, 0.1)' : candidate.status === 'Dialing' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-main)',
+                                                color: candidate.status === 'Completed' ? '#10b981' : candidate.status === 'Dialing' ? '#3b82f6' : 'var(--text-secondary)',
+                                                border: '1px solid transparent'
+                                            }}
+                                        >
+                                            {candidate.status === 'Dialing' && <span className="pulse-dot" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', marginRight: '6px' }}></span>}
+                                            {candidate.status}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                        {candidate.duration || '--'}
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        {candidate.report?.analysis?.overallScore ? (
+                                            <span style={{ fontWeight: '700', color: getScoreColor(candidate.report.analysis.overallScore) }}>
+                                                {candidate.report.analysis.overallScore}/10
+                                            </span>
+                                        ) : (
+                                            <span style={{ color: 'var(--text-tertiary)', fontSize: '12px' }}>--</span>
+                                        )}
+                                    </td>
+                                    <td style={{ padding: '16px' }}>
+                                        {candidate.status === 'Completed' ? (
+                                            <button
+                                                className="btn-view-report"
+                                                onClick={() => setSelectedReport(candidate)}
+                                                style={{
+                                                    background: 'transparent',
+                                                    border: '1px solid var(--border-subtle)',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px',
+                                                    cursor: 'pointer',
+                                                    color: 'var(--primary-500)',
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                View Report
+                                            </button>
+                                        ) : (
+                                            <button disabled style={{ opacity: 0.3, background: 'transparent', border: 'none', cursor: 'not-allowed', fontSize: '12px' }}>Pending</button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Report Modal */}
+            {selectedReport && (
+                <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '40px', overflowY: 'auto' }}>
+                    <div className="modal-content" style={{ width: '800px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-header">
+                            <h3><i className="fa-solid fa-file-contract"></i> Interview Report: {selectedReport.name}</h3>
+                            <button className="btn-close-modal" onClick={() => setSelectedReport(null)}><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+
+                            {/* Score Card */}
+                            <div style={{ display: 'flex', gap: '20px', marginBottom: '24px' }}>
+                                <div style={{ flex: 1, background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', padding: '20px', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+                                    <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '600', textTransform: 'uppercase' }}>Overall Score</div>
+                                    <div style={{ fontSize: '36px', fontWeight: '800', color: '#1d4ed8', margin: '8px 0' }}>{selectedReport.report?.analysis?.overallScore || 'N/A'}</div>
+                                    <div style={{ fontSize: '12px', color: '#60a5fa' }}>Based on generic evaluation</div>
+                                </div>
+                                <div style={{ flex: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    {/* Placeholder specific scores if available */}
+                                    <div className="stat-card-mini">
+                                        <div className="lbl">Technical</div>
+                                        <div className="val">{selectedReport.report?.analysis?.technicalScore || '-'}</div>
+                                    </div>
+                                    <div className="stat-card-mini">
+                                        <div className="lbl">Communication</div>
+                                        <div className="val">{selectedReport.report?.analysis?.communicationScore || '-'}</div>
+                                    </div>
+                                    <div className="stat-card-mini">
+                                        <div className="lbl">Cultural Fit</div>
+                                        <div className="val">{selectedReport.report?.analysis?.culturalScore || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Summary */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <h4 style={{ fontSize: '14px', marginBottom: '12px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>EXECUTIVE SUMMARY</h4>
+                                <p style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                                    {selectedReport.report?.summary || "No summary generated."}
+                                </p>
+                            </div>
+
+                            {/* Recording */}
+                            {selectedReport.report?.recording_url && (
+                                <div style={{ marginBottom: '24px', background: 'var(--bg-main)', padding: '16px', borderRadius: '8px' }}>
+                                    <h4 style={{ fontSize: '12px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>AUDIO RECORDING</h4>
+                                    <audio controls style={{ width: '100%' }}>
+                                        <source src={selectedReport.report.recording_url} type="audio/mpeg" />
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                </div>
+                            )}
+
+                            {/* Transcript */}
+                            <div>
+                                <h4 style={{ fontSize: '14px', marginBottom: '12px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>FULL TRANSCRIPT</h4>
+                                <div style={{
+                                    background: 'var(--bg-main)',
+                                    padding: '20px',
+                                    borderRadius: '8px',
+                                    maxHeight: '400px',
+                                    overflowY: 'auto',
+                                    fontFamily: 'monospace',
+                                    fontSize: '13px',
+                                    lineHeight: '1.6',
+                                    whiteSpace: 'pre-wrap'
+                                }}>
+                                    {selectedReport.report?.transcript || "No transcript available."}
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
