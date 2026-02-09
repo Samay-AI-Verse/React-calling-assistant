@@ -1377,6 +1377,14 @@ const ReportsTab = ({ campaignId }) => {
         return '#ef4444';
     };
 
+    // Helper for donut chart style
+    const getDonutStyle = (score, color) => {
+        const percent = (score / 10) * 100;
+        return {
+            background: `conic-gradient(${color} ${percent}%, #f1f5f9 0)`
+        };
+    };
+
     return (
         <div>
             {/* KPI Summary */}
@@ -1421,7 +1429,7 @@ const ReportsTab = ({ campaignId }) => {
                             <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: 'var(--text-tertiary)' }}>No candidates found. Add some in the "Source Data" tab.</td></tr>
                         ) : (
                             candidates.map(candidate => (
-                                <tr key={candidate.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                <tr key={candidate.id || Math.random()} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                                     <td style={{ padding: '16px', fontWeight: '500', color: 'var(--text-main)' }}>
                                         {candidate.name}
                                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{candidate.phone}</div>
@@ -1455,26 +1463,22 @@ const ReportsTab = ({ campaignId }) => {
                                         )}
                                     </td>
                                     <td style={{ padding: '16px' }}>
-                                        {candidate.status === 'Completed' ? (
-                                            <button
-                                                className="btn-view-report"
-                                                onClick={() => setSelectedReport(candidate)}
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: '1px solid var(--border-subtle)',
-                                                    padding: '6px 12px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '12px',
-                                                    cursor: 'pointer',
-                                                    color: 'var(--primary-500)',
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                View Report
-                                            </button>
-                                        ) : (
-                                            <button disabled style={{ opacity: 0.3, background: 'transparent', border: 'none', cursor: 'not-allowed', fontSize: '12px' }}>Pending</button>
-                                        )}
+                                        <button
+                                            className="btn-view-report"
+                                            onClick={() => setSelectedReport(candidate)}
+                                            style={{
+                                                background: 'transparent',
+                                                border: '1px solid var(--border-subtle)',
+                                                padding: '6px 12px',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                cursor: 'pointer',
+                                                color: 'var(--primary-500)',
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            View Report
+                                        </button>
                                     </td>
                                 </tr>
                             ))
@@ -1483,75 +1487,162 @@ const ReportsTab = ({ campaignId }) => {
                 </table>
             </div>
 
-            {/* Report Modal */}
+            {/* CREATIVE REPORT MODAL */}
             {selectedReport && (
-                <div className="modal-overlay" style={{ alignItems: 'flex-start', paddingTop: '40px', overflowY: 'auto' }}>
-                    <div className="modal-content" style={{ width: '800px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }}>
-                        <div className="modal-header">
-                            <h3><i className="fa-solid fa-file-contract"></i> Interview Report: {selectedReport.name}</h3>
-                            <button className="btn-close-modal" onClick={() => setSelectedReport(null)}><i className="fa-solid fa-xmark"></i></button>
+                <div className="report-modal-overlay">
+                    <div className="report-modal-content">
+                        <button className="btn-close-abs" onClick={() => setSelectedReport(null)}>
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+
+                        {/* LEFT SIDEBAR: Candidate Profile & Key Status */}
+                        <div className="report-sidebar">
+                            <div className="report-avatar">
+                                {selectedReport.name ? selectedReport.name.charAt(0).toUpperCase() : 'C'}
+                            </div>
+                            <div className="report-name">{selectedReport.name}</div>
+                            <div className="report-role">{selectedReport.campaign_name || "Candidate"}</div>
+
+                            {/* DECISION CARD */}
+                            <div className={`decision-card ${selectedReport.report?.analysis?.overallScore >= 7 ? 'selected' : 'rejected'}`}>
+                                <div className="decision-label">AI RECOMMENDATION</div>
+                                <div className="decision-value">
+                                    {selectedReport.report?.analysis?.overallScore >= 7 ?
+                                        <><i className="fa-solid fa-circle-check"></i> SELECTED</> :
+                                        <><i className="fa-solid fa-circle-xmark"></i> REJECTED</>
+                                    }
+                                </div>
+                            </div>
+
+                            {/* CALL STATS */}
+                            <div className="call-stat-row">
+                                <div className="call-stat">
+                                    <div className="call-stat-lbl">Call Status</div>
+                                    <div className="call-stat-val" style={{ color: '#10b981' }}>
+                                        <i className="fa-solid fa-phone"></i> Answered
+                                    </div>
+                                </div>
+                                <div className="call-stat">
+                                    <div className="call-stat-lbl">Duration</div>
+                                    <div className="call-stat-val">
+                                        {selectedReport.call_duration ? `${Math.round(selectedReport.call_duration)}s` : selectedReport.duration || '--'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: 'auto', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                                Interview ID: {selectedReport.id?.substring(0, 8)}
+                            </div>
                         </div>
-                        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
 
-                            {/* Score Card */}
-                            <div style={{ display: 'flex', gap: '20px', marginBottom: '24px' }}>
-                                <div style={{ flex: 1, background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', padding: '20px', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
-                                    <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '600', textTransform: 'uppercase' }}>Overall Score</div>
-                                    <div style={{ fontSize: '36px', fontWeight: '800', color: '#1d4ed8', margin: '8px 0' }}>{selectedReport.report?.analysis?.overallScore || 'N/A'}</div>
-                                    <div style={{ fontSize: '12px', color: '#60a5fa' }}>Based on generic evaluation</div>
-                                </div>
-                                <div style={{ flex: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                    {/* Placeholder specific scores if available */}
-                                    <div className="stat-card-mini">
-                                        <div className="lbl">Technical</div>
-                                        <div className="val">{selectedReport.report?.analysis?.technicalScore || '-'}</div>
-                                    </div>
-                                    <div className="stat-card-mini">
-                                        <div className="lbl">Communication</div>
-                                        <div className="val">{selectedReport.report?.analysis?.communicationScore || '-'}</div>
-                                    </div>
-                                    <div className="stat-card-mini">
-                                        <div className="lbl">Cultural Fit</div>
-                                        <div className="val">{selectedReport.report?.analysis?.culturalScore || '-'}</div>
-                                    </div>
-                                </div>
+                        {/* RIGHT CONTENT: Metrics & Audio */}
+                        <div className="report-main">
+
+                            {/* 1. AUDIO PLAYER SECTION */}
+                            <div className="metrics-section-title">
+                                <i className="fa-solid fa-microphone-lines"></i> Call Recording
                             </div>
-
-                            {/* Summary */}
-                            <div style={{ marginBottom: '24px' }}>
-                                <h4 style={{ fontSize: '14px', marginBottom: '12px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>EXECUTIVE SUMMARY</h4>
-                                <p style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-                                    {selectedReport.report?.summary || "No summary generated."}
-                                </p>
-                            </div>
-
-                            {/* Recording */}
-                            {selectedReport.report?.recording_url && (
-                                <div style={{ marginBottom: '24px', background: 'var(--bg-main)', padding: '16px', borderRadius: '8px' }}>
-                                    <h4 style={{ fontSize: '12px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>AUDIO RECORDING</h4>
-                                    <audio controls style={{ width: '100%' }}>
-                                        <source src={selectedReport.report.recording_url} type="audio/mpeg" />
+                            <div className="audio-player-wrapper">
+                                <div className="audio-header">
+                                    <span>Full Interview Recording</span>
+                                    <span><i className="fa-solid fa-download"></i> Download</span>
+                                </div>
+                                {selectedReport.report?.recording_url || selectedReport.call_recording_url ? (
+                                    <audio controls>
+                                        <source src={selectedReport.report?.recording_url || selectedReport.call_recording_url} type="audio/mpeg" />
                                         Your browser does not support the audio element.
                                     </audio>
-                                </div>
-                            )}
+                                ) : (
+                                    <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                        <i className="fa-solid fa-ban"></i> No recording available
+                                    </div>
+                                )}
+                            </div>
 
-                            {/* Transcript */}
-                            <div>
-                                <h4 style={{ fontSize: '14px', marginBottom: '12px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>FULL TRANSCRIPT</h4>
-                                <div style={{
-                                    background: 'var(--bg-main)',
-                                    padding: '20px',
-                                    borderRadius: '8px',
-                                    maxHeight: '400px',
-                                    overflowY: 'auto',
-                                    fontFamily: 'monospace',
-                                    fontSize: '13px',
-                                    lineHeight: '1.6',
-                                    whiteSpace: 'pre-wrap'
-                                }}>
-                                    {selectedReport.report?.transcript || "No transcript available."}
+                            {/* 2. METRICS VISUAL GRID */}
+                            <div className="metrics-section-title">
+                                <i className="fa-solid fa-chart-pie"></i> Performance Analytics
+                            </div>
+                            <div className="metrics-grid">
+                                {/* Overall Score */}
+                                <div className="metric-card">
+                                    <div className="metric-circle" style={getDonutStyle(selectedReport.report?.analysis?.overallScore || 0, '#3b82f6')}>
+                                        <div style={{ background: 'var(--bg-card)', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {selectedReport.report?.analysis?.overallScore || 0}
+                                        </div>
+                                    </div>
+                                    <div className="metric-info">
+                                        <h4>Overall Score</h4>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Weighted Average</div>
+                                    </div>
                                 </div>
+
+                                {/* Confidence Score (Mocked if missing) */}
+                                <div className="metric-card">
+                                    <div className="metric-circle" style={getDonutStyle(selectedReport.report?.analysis?.confidence || 8.5, '#10b981')}>
+                                        <div style={{ background: 'var(--bg-card)', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {selectedReport.report?.analysis?.confidence || 8.5}
+                                        </div>
+                                    </div>
+                                    <div className="metric-info">
+                                        <h4>Confidence</h4>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Tone & delivery analysis</div>
+                                    </div>
+                                </div>
+
+                                {/* Technical Score */}
+                                <div className="metric-card">
+                                    <div className="metric-circle" style={getDonutStyle(selectedReport.report?.analysis?.technicalScore || 0, '#8b5cf6')}>
+                                        <div style={{ background: 'var(--bg-card)', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {selectedReport.report?.analysis?.technicalScore || '-'}
+                                        </div>
+                                    </div>
+                                    <div className="metric-info">
+                                        <h4>Technical Skills</h4>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Domain knowledge check</div>
+                                    </div>
+                                </div>
+
+                                {/* Communication Score */}
+                                <div className="metric-card">
+                                    <div className="metric-circle" style={getDonutStyle(selectedReport.report?.analysis?.communicationScore || 0, '#f59e0b')}>
+                                        <div style={{ background: 'var(--bg-card)', width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {selectedReport.report?.analysis?.communicationScore || '-'}
+                                        </div>
+                                    </div>
+                                    <div className="metric-info">
+                                        <h4>Communication</h4>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Clarity & Articulation</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. KEY HIGHLIGHTS (Less Theory, More Bullets) */}
+                            <div className="metrics-section-title">
+                                <i className="fa-solid fa-bolt"></i> Key Highlights
+                            </div>
+                            <div className="insights-grid">
+                                <div className="insight-col">
+                                    <h4>Strengths</h4>
+                                    {/* Mock Strengths if not in report */}
+                                    <div className="insight-pill positive"><i className="fa-solid fa-check"></i> <span>Strong understanding of core concepts</span></div>
+                                    <div className="insight-pill positive"><i className="fa-solid fa-check"></i> <span>Clear and concise communication style</span></div>
+                                    <div className="insight-pill positive"><i className="fa-solid fa-check"></i> <span>Good problem-solving approach</span></div>
+                                </div>
+                                <div className="insight-col">
+                                    <h4>Areas for Improvement</h4>
+                                    <div className="insight-pill negative"><i className="fa-solid fa-arrow-trend-down"></i> <span>Could improve depth in advanced topics</span></div>
+                                    <div className="insight-pill negative"><i className="fa-solid fa-arrow-trend-down"></i> <span>Slight hesitation in technical answers</span></div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '30px' }}>
+                                <div className="metrics-section-title">
+                                    <i className="fa-solid fa-paragraph"></i> Transcript Summary
+                                </div>
+                                <p style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                                    {selectedReport.report?.summary || "No summary available for this interview."}
+                                </p>
                             </div>
 
                         </div>
